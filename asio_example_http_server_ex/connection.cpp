@@ -28,7 +28,7 @@ namespace timax
 		do_read();
 	}
 
-	void connection::terminate()
+	inline void connection::close()
 	{
 		boost::system::error_code ec;
 		socket_.close(ec);
@@ -48,7 +48,7 @@ namespace timax
 				return;
 			}
 
-			self->terminate();
+			self->close();
 		});
 	}
 
@@ -63,13 +63,6 @@ namespace timax
 			boost::bind(&connection::handle_read, shared_from_this(),
 				boost::asio::placeholders::error,
 				boost::asio::placeholders::bytes_transferred));
-	}
-
-	void connection::do_write()
-	{
-		boost::asio::async_write(socket_, reply_.to_buffers(),
-			boost::bind(&connection::handle_write, shared_from_this(),
-				boost::asio::placeholders::error));
 	}
 
 	void connection::handle_read(const boost::system::error_code& e,
@@ -110,22 +103,7 @@ namespace timax
 			return;
 		}
 
-		auto conn_hdr = request_.get_header("connection");
-		if (request_.is_http1_1())
-		{
-			// HTTP1.1
-			//头部中没有包含connection字段
-			//或者头部中包含了connection字段但是值不为close
-			//这种情况是长连接
-			keep_alive_ = conn_hdr.empty() || !boost::iequals(conn_hdr, "close");
-		}
-		else
-		{
-			//HTTP1.0或其他(0.9 or ?)
-			//头部包含connection,并且connection字段值为keep-alive
-			//这种情况下是长连接
-			keep_alive_ = !conn_hdr.empty() && boost::iequals(conn_hdr, "keep-alive");
-		}
+		keep_alive_ = check_keep_alive();
 
 		if (request_handler_)
 		{
@@ -148,6 +126,13 @@ namespace timax
 		do_write();
 	}
 
+	void connection::do_write()
+	{
+		boost::asio::async_write(socket_, reply_.to_buffers(),
+			boost::bind(&connection::handle_write, shared_from_this(),
+				boost::asio::placeholders::error));
+	}
+
 	void connection::handle_write(const boost::system::error_code& e)
 	{
 		reply_.reset();
@@ -155,7 +140,6 @@ namespace timax
 		{
 			return;
 		}
-
 
 		if (!keep_alive_)
 		{
@@ -165,5 +149,27 @@ namespace timax
 		}
 
 		start();
+	}
+
+	inline bool connection::check_keep_alive()
+	{
+		auto conn_hdr = request_.get_header("connection", 10);
+		if (request_.is_http1_1())
+		{
+			// HTTP1.1
+			//头部中没有包含connection字段
+			//或者头部中包含了connection字段但是值不为close
+			//这种情况是长连接
+			//keep_alive_ = conn_hdr.empty() || !boost::iequals(conn_hdr, "close");
+			return conn_hdr.empty() || !iequal(conn_hdr.data(), conn_hdr.size(), "close", 5);
+		}
+		else
+		{
+			//HTTP1.0或其他(0.9 or ?)
+			//头部包含connection,并且connection字段值为keep-alive
+			//这种情况下是长连接
+			//keep_alive_ = !conn_hdr.empty() && boost::iequals(conn_hdr, "keep-alive");
+			return !conn_hdr.empty() && iequal(conn_hdr.data(), conn_hdr.size(), "keep-alive", 10);
+		}
 	}
 }

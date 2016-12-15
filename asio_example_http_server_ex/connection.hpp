@@ -25,7 +25,7 @@ namespace timax
 
 		void start();
 
-		void terminate();
+		void close();
 
 	private:
 
@@ -39,6 +39,8 @@ namespace timax
 
 		void handle_write(const boost::system::error_code& e);
 
+		bool check_keep_alive();
+	private:
 		boost::asio::ip::tcp::socket socket_;
 
 		request_handler_t& request_handler_;

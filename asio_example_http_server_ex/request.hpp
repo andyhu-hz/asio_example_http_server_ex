@@ -11,6 +11,20 @@
 
 namespace timax
 {
+	bool inline iequal(const char* src, size_t src_len, const char* dest, size_t dest_len)
+	{
+		if (src_len != dest_len)
+			return false;
+
+		for (size_t i = 0; i < src_len; i++)
+		{
+			if (std::tolower(src[i]) != dest[i])
+				return false;
+		}
+
+		return true;
+	}
+
 	class request
 	{
 	public:
@@ -43,11 +57,11 @@ namespace timax
 			return minor_version_ == 1;
 		}
 
-		boost::string_ref get_header(std::string const& name) const
+		boost::string_ref get_header(const char* name, size_t size) const
 		{
-			auto it = std::find_if(headers_, headers_ + num_headers_, [&name](struct phr_header const& hdr)
+			auto it = std::find_if(headers_, headers_ + num_headers_, [this, name, size](struct phr_header const& hdr)
 			{
-				return boost::iequals(boost::string_ref(hdr.name, hdr.name_len), name);
+				return iequal(hdr.name, hdr.name_len, name, size);
 			});
 
 			if (it == headers_ + num_headers_)
@@ -58,12 +72,12 @@ namespace timax
 			return boost::string_ref(it->value, it->value_len);
 		}
 
-		std::vector<boost::string_ref> get_headers(std::string const& name) const
+		std::vector<boost::string_ref> get_headers(const char* name, size_t size) const
 		{
 			std::vector<boost::string_ref> headers;
 			for (std::size_t i = 0; i < num_headers_; ++i)
 			{
-				if (boost::iequals(boost::string_ref(headers_[i].name, headers_[i].name_len), name))
+				if (iequal(headers_[i].name, headers_[i].name_len, name, size))
 				{
 					headers.emplace_back(boost::string_ref(headers_[i].value, headers_[i].value_len));
 				}
@@ -92,22 +106,22 @@ namespace timax
 			return headers;
 		}
 
-		bool has_header(std::string const& name) const
+		bool has_header(const char* name, size_t size) const
 		{
-			auto it = std::find_if(headers_, headers_ + num_headers_, [&name](struct phr_header const& hdr)
+			auto it = std::find_if(headers_, headers_ + num_headers_, [name, size](struct phr_header const& hdr)
 			{
-				return boost::iequals(boost::string_ref(hdr.name, hdr.name_len), name);
+				return iequal(hdr.name, hdr.name_len, name, size);
 			});
 
 			return it != headers_ + num_headers_;
 		}
 
-		std::size_t headers_num(std::string const& name) const
+		std::size_t headers_num(const char* name, size_t size) const
 		{
 			std::size_t num = 0;
 			for (std::size_t i = 0; i < num_headers_; ++i)
 			{
-				if (boost::iequals(boost::string_ref(headers_[i].name, headers_[i].name_len), name))
+				if (iequal(headers_[i].name, headers_[i].name_len, name, size))
 				{
 					++num;
 				}

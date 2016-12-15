@@ -13,14 +13,13 @@ INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
 find_package( Threads )
 
 set(SOURCE_FILES
-        main.cpp
-        connection.cpp
-        io_service_pool.cpp
-        mime_types.cpp
-        reply.cpp
-        request_handler.cpp
-        server.cpp
-        picohttpparser.c)
+        asio_example_http_server_ex/main.cpp
+        asio_example_http_server_ex/connection.cpp
+        asio_example_http_server_ex/io_service_pool.cpp
+        asio_example_http_server_ex/mime_types.cpp
+        asio_example_http_server_ex/reply.cpp
+        asio_example_http_server_ex/server.cpp
+        asio_example_http_server_ex/picohttpparser.c)
 
 add_executable(asio_example_http_server ${SOURCE_FILES})
 target_link_libraries(asio_example_http_server ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
