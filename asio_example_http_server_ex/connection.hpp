@@ -25,7 +25,7 @@ namespace timax
 
 		void start();
 
-		void terminate();
+		void close();
 
 	private:
 

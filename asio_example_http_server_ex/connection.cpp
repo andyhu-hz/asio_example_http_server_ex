@@ -28,7 +28,7 @@ namespace timax
 		do_read();
 	}
 
-	void connection::terminate()
+	void connection::close()
 	{
 		boost::system::error_code ec;
 		socket_.close(ec);
@@ -48,7 +48,7 @@ namespace timax
 				return;
 			}
 
-			self->terminate();
+			self->close();
 		});
 	}
 
@@ -140,7 +140,6 @@ namespace timax
 		{
 			return;
 		}
-
 
 		if (!keep_alive_)
 		{
