@@ -97,6 +97,7 @@ namespace timax
 	std::vector<boost::asio::const_buffer> reply::to_buffers()
 	{
 		std::vector<boost::asio::const_buffer> buffers;
+		buffers.reserve(headers.size() * 4 + 4);
 		buffers.push_back(status_strings::to_buffer(status));
 		for (std::size_t i = 0; i < headers.size(); ++i)
 		{
