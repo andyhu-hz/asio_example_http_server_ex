@@ -43,11 +43,17 @@ namespace timax
 			return minor_version_ == 1;
 		}
 
-		boost::string_ref get_header(std::string const& name) const
+		boost::string_ref get_header(const char* name) const
 		{
-			auto it = std::find_if(headers_, headers_ + num_headers_, [&name](struct phr_header const& hdr)
+			auto it = std::find_if(headers_, headers_ + num_headers_, [this, name](struct phr_header const& hdr)
 			{
-				return boost::iequals(boost::string_ref(hdr.name, hdr.name_len), name);
+				for (size_t i = 0; i < hdr.name_len; i++)
+				{
+					if (std::tolower(hdr.name[i]) != name[i])
+						return false;
+				}
+
+				return true;
 			});
 
 			if (it == headers_ + num_headers_)

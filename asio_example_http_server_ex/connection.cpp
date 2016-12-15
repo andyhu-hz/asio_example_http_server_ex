@@ -72,6 +72,17 @@ namespace timax
 				boost::asio::placeholders::error));
 	}
 
+	bool iequal(const char* src, const char* dest, size_t size)
+	{
+		for (size_t i = 0; i < size; i++)
+		{
+			if (std::tolower(src[i]) != dest[i])
+				return false;
+		}
+
+		return true;
+	}
+
 	void connection::handle_read(const boost::system::error_code& e,
 		std::size_t bytes_transferred)
 	{
@@ -117,14 +128,16 @@ namespace timax
 			//头部中没有包含connection字段
 			//或者头部中包含了connection字段但是值不为close
 			//这种情况是长连接
-			keep_alive_ = conn_hdr.empty() || !boost::iequals(conn_hdr, "close");
+			//keep_alive_ = conn_hdr.empty() || !boost::iequals(conn_hdr, "close");
+			keep_alive_ = conn_hdr.empty() || !iequal(conn_hdr.data(), "close", 5);
 		}
 		else
 		{
 			//HTTP1.0或其他(0.9 or ?)
 			//头部包含connection,并且connection字段值为keep-alive
 			//这种情况下是长连接
-			keep_alive_ = !conn_hdr.empty() && boost::iequals(conn_hdr, "keep-alive");
+			//keep_alive_ = !conn_hdr.empty() && boost::iequals(conn_hdr, "keep-alive");
+			keep_alive_ = !conn_hdr.empty() && iequal(conn_hdr.data(), "keep-alive", 10);
 		}
 
 		if (request_handler_)
