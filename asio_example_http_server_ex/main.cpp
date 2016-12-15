@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
 	{
 		if (argc != 4)
 		{
-			std::cerr << "Usage: http_server <address> <port> <threads> <doc_root>\n";
+			std::cerr << "Usage: http_server <address> <port> <threads>\n";
 			std::cerr << "  For IPv4, try:\n";
 			std::cerr << "    receiver 0.0.0.0 80 1\n";
 			std::cerr << "  For IPv6, try:\n";
@@ -25,8 +25,8 @@ int main(int argc, char* argv[])
 		s.request_handler([](const timax::request& req, timax::reply& rep)
 		{
 			rep.status = timax::reply::ok;
-			rep.headers.emplace_back(timax::header{ "Content-Length", "1" });
-			rep.content = "1";
+			rep.headers.emplace_back(timax::header{ "Content-Length", "11" });
+			rep.content = "Hello World";
 		});
 
 		s.run();
