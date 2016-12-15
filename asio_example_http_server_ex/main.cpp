@@ -24,6 +24,7 @@ int main(int argc, char* argv[])
 		timax::server s(argv[1], argv[2], num_threads);
 		s.request_handler([](const timax::request& req, timax::reply& rep)
 		{
+			std::cout << req.body() << std::endl;
 			rep.status = timax::reply::ok;
 			rep.headers.emplace_back(timax::header{ "Content-Length", "11" });
 			rep.content = "Hello World";

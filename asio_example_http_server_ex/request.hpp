@@ -3,8 +3,9 @@
 
 #include "picohttpparser.h"
 
-#include <boost/utility/string_ref.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/utility/string_ref.hpp>
+#include <boost/lexical_cast/try_lexical_convert.hpp>
 
 #include <string>
 #include <vector>
@@ -30,10 +31,21 @@ namespace timax
 	public:
 		int parse(const char* data, std::size_t len, std::size_t last_len)
 		{
+			data_ = data;
 			num_headers_ = sizeof(headers_) / sizeof(headers_[0]);
-			return phr_parse_request(data, len, &method_,
+			header_size_ = phr_parse_request(data_, len, &method_,
 				&method_len_, &path_, &path_len_,
 				&minor_version_, headers_, &num_headers_, last_len);
+
+			auto content_length = get_header("content-length");
+
+			if (content_length.empty()
+				|| !boost::conversion::try_lexical_convert<size_t>(content_length.data(), content_length.size(), body_len_))
+			{
+				body_len_ = 0;
+			}
+
+			return header_size_;
 		}
 
 
@@ -57,6 +69,10 @@ namespace timax
 			return minor_version_ == 1;
 		}
 
+		boost::string_ref get_header(const std::string& name)
+		{
+			return get_header(name.data(), name.size());
+		}
 		boost::string_ref get_header(const char* name, size_t size) const
 		{
 			auto it = std::find_if(headers_, headers_ + num_headers_, [this, name, size](struct phr_header const& hdr)
@@ -72,6 +88,10 @@ namespace timax
 			return boost::string_ref(it->value, it->value_len);
 		}
 
+		std::vector<boost::string_ref> get_headers(const std::string& name) const
+		{
+			return get_headers(name.data(), name.size());
+		}
 		std::vector<boost::string_ref> get_headers(const char* name, size_t size) const
 		{
 			std::vector<boost::string_ref> headers;
@@ -106,6 +126,10 @@ namespace timax
 			return headers;
 		}
 
+		bool has_header(const std::string& name) const
+		{
+			return has_header(name.data(), name.size());
+		}
 		bool has_header(const char* name, size_t size) const
 		{
 			auto it = std::find_if(headers_, headers_ + num_headers_, [name, size](struct phr_header const& hdr)
@@ -116,6 +140,10 @@ namespace timax
 			return it != headers_ + num_headers_;
 		}
 
+		std::size_t headers_num(const std::string& name) const
+		{
+			return headers_num(name.data(), name.size());
+		}
 		std::size_t headers_num(const char* name, size_t size) const
 		{
 			std::size_t num = 0;
@@ -188,7 +216,20 @@ namespace timax
 			return num;
 		}
 
+		boost::string_ref body() const
+		{
+			return boost::string_ref(data_ + header_size_, body_len_);
+		}
+
+		boost::string_ref request_data() const
+		{
+			boost::string_ref(data_, header_size_ + body_len_);
+		}
+
+		int header_size() const { return header_size_; }
+		size_t body_len() const { return body_len_; }
 	private:
+		const char* data_;
 		const char* method_;
 		size_t method_len_;
 		const char* path_;
@@ -196,6 +237,9 @@ namespace timax
 		int minor_version_;
 		struct phr_header headers_[100];
 		size_t num_headers_;
+
+		int header_size_;
+		size_t body_len_;
 	};
 }
 

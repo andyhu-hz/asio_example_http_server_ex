@@ -33,7 +33,11 @@ namespace timax
 
 		void do_read();
 
+		void do_read_body();
+
 		void do_write();
+
+		void do_request();
 
 		void handle_read(const boost::system::error_code& e, std::size_t bytes_transferred);
 
@@ -47,6 +51,7 @@ namespace timax
 
 		std::vector<char> buffer_;
 		std::size_t nread_;
+
 
 		request request_;
 

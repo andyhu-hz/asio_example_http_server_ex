@@ -65,6 +65,34 @@ namespace timax
 				boost::asio::placeholders::bytes_transferred));
 	}
 
+	void connection::do_read_body()
+	{
+		reset_timer();
+		std::size_t req_len = request_.header_size() + request_.body_len();
+		if (buffer_.size()< req_len)
+		{
+			buffer_.resize(req_len);
+		}
+
+		auto self = this->shared_from_this();
+		socket_.async_receive(boost::asio::buffer(buffer_.data() + nread_, req_len - nread_),
+			[self, this](boost::system::error_code ec, std::size_t /*length*/)
+		{
+			if (ec)
+			{
+				return;
+			}
+			/*
+			if (length != request_.header_size() + request_.body_len())
+			{
+				return;
+			}
+			*/
+
+			do_request();
+		});
+	}
+
 	void connection::handle_read(const boost::system::error_code& e,
 		std::size_t bytes_transferred)
 	{
@@ -103,6 +131,30 @@ namespace timax
 			return;
 		}
 
+
+		if (request_.header_size() + request_.body_len() >= 2 * 1024 * 1024)
+		{
+			return;
+		}
+
+		if (request_.body_len() != 0)
+		{
+			do_read_body();
+			return;
+		}
+
+		do_request();
+	}
+
+	void connection::do_write()
+	{
+		boost::asio::async_write(socket_, reply_.to_buffers(),
+			boost::bind(&connection::handle_write, shared_from_this(),
+				boost::asio::placeholders::error));
+	}
+
+	void connection::do_request()
+	{
 		keep_alive_ = check_keep_alive();
 
 		if (request_handler_)
@@ -124,13 +176,6 @@ namespace timax
 		}
 
 		do_write();
-	}
-
-	void connection::do_write()
-	{
-		boost::asio::async_write(socket_, reply_.to_buffers(),
-			boost::bind(&connection::handle_write, shared_from_this(),
-				boost::asio::placeholders::error));
 	}
 
 	void connection::handle_write(const boost::system::error_code& e)
