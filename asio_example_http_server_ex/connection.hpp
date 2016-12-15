@@ -39,8 +39,6 @@ namespace timax
 
 		void handle_write(const boost::system::error_code& e);
 
-		bool iequal(const char* src, const char* dest, size_t size);
-
 		bool check_keep_alive();
 	private:
 		boost::asio::ip::tcp::socket socket_;

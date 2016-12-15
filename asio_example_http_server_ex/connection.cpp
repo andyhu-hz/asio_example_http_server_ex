@@ -28,7 +28,7 @@ namespace timax
 		do_read();
 	}
 
-	void connection::close()
+	inline void connection::close()
 	{
 		boost::system::error_code ec;
 		socket_.close(ec);
@@ -151,20 +151,9 @@ namespace timax
 		start();
 	}
 
-	inline bool connection::iequal(const char* src, const char* dest, size_t size)
-	{
-		for (size_t i = 0; i < size; i++)
-		{
-			if (std::tolower(src[i]) != dest[i])
-				return false;
-		}
-
-		return true;
-	}
-
 	inline bool connection::check_keep_alive()
 	{
-		auto conn_hdr = request_.get_header("connection");
+		auto conn_hdr = request_.get_header("connection", 10);
 		if (request_.is_http1_1())
 		{
 			// HTTP1.1
@@ -172,7 +161,7 @@ namespace timax
 			//或者头部中包含了connection字段但是值不为close
 			//这种情况是长连接
 			//keep_alive_ = conn_hdr.empty() || !boost::iequals(conn_hdr, "close");
-			return conn_hdr.empty() || !iequal(conn_hdr.data(), "close", 5);
+			return conn_hdr.empty() || !iequal(conn_hdr.data(), conn_hdr.size(), "close", 5);
 		}
 		else
 		{
@@ -180,7 +169,7 @@ namespace timax
 			//头部包含connection,并且connection字段值为keep-alive
 			//这种情况下是长连接
 			//keep_alive_ = !conn_hdr.empty() && boost::iequals(conn_hdr, "keep-alive");
-			return !conn_hdr.empty() && iequal(conn_hdr.data(), "keep-alive", 10);
+			return !conn_hdr.empty() && iequal(conn_hdr.data(), conn_hdr.size(), "keep-alive", 10);
 		}
 	}
 }
