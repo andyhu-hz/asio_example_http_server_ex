@@ -19,7 +19,7 @@ namespace timax
 
 		for (size_t i = 0; i < src_len; i++)
 		{
-			if (std::tolower(src[i]) != dest[i])
+			if (std::tolower(src[i]) != std::tolower(dest[i]))
 				return false;
 		}
 
@@ -37,7 +37,7 @@ namespace timax
 				&method_len_, &path_, &path_len_,
 				&minor_version_, headers_, &num_headers_, last_len);
 
-			auto content_length = get_header("content-length");
+			auto content_length = get_header("content-length", 14);
 
 			if (content_length.empty()
 				|| !boost::conversion::try_lexical_convert<size_t>(content_length.data(), content_length.size(), body_len_))
