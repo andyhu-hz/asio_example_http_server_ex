@@ -1,9 +1,10 @@
 ﻿
 #pragma once
 
+#include "utils.h"
+
 #include "picohttpparser.h"
 
-#include <boost/algorithm/string.hpp>
 #include <boost/utility/string_ref.hpp>
 #include <boost/lexical_cast/try_lexical_convert.hpp>
 
@@ -12,20 +13,6 @@
 
 namespace timax
 {
-	bool inline iequal(const char* src, size_t src_len, const char* dest, size_t dest_len)
-	{
-		if (src_len != dest_len)
-			return false;
-
-		for (size_t i = 0; i < src_len; i++)
-		{
-			if (std::tolower(src[i]) != std::tolower(dest[i]))
-				return false;
-		}
-
-		return true;
-	}
-
 	class request
 	{
 	public:
@@ -69,7 +56,7 @@ namespace timax
 			return minor_version_ == 1;
 		}
 
-		boost::string_ref get_header(const std::string& name)
+		boost::string_ref get_header(const std::string& name) const
 		{
 			return get_header(name.data(), name.size());
 		}

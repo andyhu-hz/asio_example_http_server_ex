@@ -1,19 +1,18 @@
 ﻿
 #pragma once
 
-#include "header.hpp"
-
+#include "utils.h"
 #include <boost/asio.hpp>
+#include <boost/utility/string_ref.hpp>
 
 #include <string>
 #include <vector>
 
 namespace timax
 {
-	/// A reply to be sent to a client.
-	struct reply
+	class reply
 	{
-		/// The status of the reply.
+	public:
 		enum status_type
 		{
 			ok = 200,
@@ -32,27 +31,49 @@ namespace timax
 			not_implemented = 501,
 			bad_gateway = 502,
 			service_unavailable = 503
-		} status;
+		};
 
-		/// The headers to be included in the reply.
-		std::vector<header> headers;
-
-		/// The content to be sent in the reply.
-		std::string content;
-
-		/// Convert the reply into a vector of buffers. The buffers do not own the
-		/// underlying memory blocks, therefore the reply object must remain valid and
-		/// not be changed until the write operation has completed.
-		std::vector<boost::asio::const_buffer> to_buffers();
-
-		/// Get a stock reply.
-		static reply stock_reply(status_type status);
-
-		void reset()
+		struct header_t
 		{
-			status = bad_request;
-			headers.clear();
-			content.clear();
-		}
+			std::string name;
+			std::string value;
+		};
+
+		std::vector<boost::asio::const_buffer> to_buffers();
+		static reply stock_reply(status_type status);
+		void reset();
+
+		void set_status(status_type status);
+		std::vector<header_t>& headers();
+		std::vector<header_t> const& headers() const;
+		void add_header(std::string const& name, std::string const& value);
+		
+		boost::string_ref get_header(const std::string& name);
+		boost::string_ref get_header(const char* name, size_t size) const;
+
+		std::vector<boost::string_ref> get_headers(const std::string& name) const;
+		std::vector<boost::string_ref> get_headers(const char* name, size_t size) const;
+
+		bool has_header(const std::string& name) const;
+		bool has_header(const char* name, size_t size) const;
+
+		std::size_t headers_num(const std::string& name) const;
+		std::size_t headers_num(const char* name, size_t size) const;
+
+		std::size_t headers_num() const;
+
+		boost::string_ref get_header_cs(std::string const& name) const;
+
+		std::vector<boost::string_ref> get_headers_cs(std::string const& name) const;
+
+		bool has_header_cs(std::string const& name) const;
+
+		std::size_t headers_num_cs(std::string const& name) const;
+
+		void set_body(std::string body);
+	private:
+		std::vector<header_t> headers_;
+		std::string content_;
+		status_type status_;
 	};
 }

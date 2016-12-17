@@ -168,11 +168,11 @@ namespace timax
 
 		if (keep_alive_)
 		{
-			reply_.headers.emplace_back(header{ "Connection", "keep-alive" });
+			reply_.add_header("Connection", "keep-alive" );
 		}
 		else
 		{
-			reply_.headers.emplace_back(header{ "Connection", "close" });
+			reply_.add_header("Connection", "close");
 		}
 
 		do_write();

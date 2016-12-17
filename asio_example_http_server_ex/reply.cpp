@@ -7,7 +7,6 @@
 
 namespace timax
 {
-
 	namespace status_strings
 	{
 		const std::string ok =
@@ -97,18 +96,17 @@ namespace timax
 	std::vector<boost::asio::const_buffer> reply::to_buffers()
 	{
 		std::vector<boost::asio::const_buffer> buffers;
-		buffers.reserve(headers.size() * 4 + 4);
-		buffers.push_back(status_strings::to_buffer(status));
-		for (std::size_t i = 0; i < headers.size(); ++i)
+		buffers.reserve(headers_.size() * 4 + 4);
+		buffers.push_back(status_strings::to_buffer(status_));
+		for (auto const& h : headers_)
 		{
-			header& h = headers[i];
 			buffers.push_back(boost::asio::buffer(h.name));
 			buffers.push_back(boost::asio::buffer(misc_strings::name_value_separator));
 			buffers.push_back(boost::asio::buffer(h.value));
 			buffers.push_back(boost::asio::buffer(misc_strings::crlf));
 		}
 		buffers.push_back(boost::asio::buffer(misc_strings::crlf));
-		buffers.push_back(boost::asio::buffer(content));
+		buffers.push_back(boost::asio::buffer(content_));
 		return buffers;
 	}
 
@@ -237,14 +235,184 @@ namespace timax
 	reply reply::stock_reply(reply::status_type status)
 	{
 		reply rep;
-		rep.status = status;
-		rep.content = stock_replies::to_string(status);
-		rep.headers.resize(2);
-		rep.headers[0].name = "Content-Length";
-		rep.headers[0].value = boost::lexical_cast<std::string>(rep.content.size());
-		rep.headers[1].name = "Content-Type";
-		rep.headers[1].value = "text/html";
+		rep.status_ = status;
+		rep.content_ = stock_replies::to_string(status);
+		rep.headers_.resize(2);
+		rep.headers_[0].name = "Content-Length";
+		rep.headers_[0].value = boost::lexical_cast<std::string>(rep.content_.size());
+		rep.headers_[1].name = "Content-Type";
+		rep.headers_[1].value = "text/html";
 		return rep;
+	}
+
+	void reply::reset()
+	{
+		status_ = bad_request;
+		headers_.clear();
+		content_.clear();
+	}
+
+	void reply::set_status(status_type status)
+	{
+		status_ = status;
+	}
+
+	std::vector<timax::reply::header_t>& reply::headers()
+	{
+		return headers_;
+	}
+
+	std::vector<timax::reply::header_t> const& reply::headers() const
+	{
+		return headers_;
+	}
+
+	void reply::add_header(std::string const& name, std::string const& value)
+	{
+		headers_.emplace_back(header_t{ name, value });
+	}
+
+	boost::string_ref reply::get_header(const std::string& name)
+	{
+		return get_header(name.data(), name.size());
+	}
+
+	boost::string_ref reply::get_header(const char* name, size_t size) const
+	{
+		auto it = std::find_if(headers_.cbegin(), headers_.cend(), [this, name, size](header_t const& hdr)
+		{
+			return iequal(hdr.name.data(), hdr.name.size(), name, size);
+		});
+
+		if (it == headers_.cend())
+		{
+			return{};
+		}
+
+		return it->value;
+	}
+
+	std::vector<boost::string_ref> reply::get_headers(const std::string& name) const
+	{
+		return get_headers(name.data(), name.size());
+	}
+
+	std::vector<boost::string_ref> reply::get_headers(const char* name, size_t size) const
+	{
+		std::vector<boost::string_ref> headers;
+		for (auto const& it : headers_)
+		{
+			if (iequal(it.name.data(), it.name.size(), name, size))
+			{
+				headers.emplace_back(boost::string_ref(it.value.data(), it.value.size()));
+			}
+		}
+
+		return headers;
+	}
+
+
+
+	bool reply::has_header(const std::string& name) const
+	{
+		return has_header(name.data(), name.size());
+	}
+
+	bool reply::has_header(const char* name, size_t size) const
+	{
+		auto it = std::find_if(headers_.cbegin(), headers_.cend(), [name, size](header_t const& hdr)
+		{
+			return iequal(hdr.name.data(), hdr.name.size(), name, size);
+		});
+
+		return it != headers_.cend();
+	}
+
+	std::size_t reply::headers_num(const std::string& name) const
+	{
+		return headers_num(name.data(), name.size());
+	}
+
+	std::size_t reply::headers_num(const char* name, size_t size) const
+	{
+		std::size_t num = 0;
+		for (auto const& it : headers_)
+		{
+			if (iequal(it.name.data(), it.name.size(), name, size))
+			{
+				++num;
+			}
+		}
+
+		return num;
+	}
+
+	std::size_t reply::headers_num() const
+	{
+		return headers_.size();
+	}
+
+	boost::string_ref reply::get_header_cs(std::string const& name) const
+	{
+		auto it = std::find_if(headers_.cbegin(), headers_.cend(), [&name](header_t const& hdr)
+		{
+			return hdr.name == name;
+		});
+
+		if (it == headers_.cend())
+		{
+			return{};
+		}
+
+		return boost::string_ref(it->value.data(), it->value.size());
+	}
+
+	std::vector<boost::string_ref> reply::get_headers_cs(std::string const& name) const
+	{
+		std::vector<boost::string_ref> headers;
+		for (auto const& it : headers_)
+		{
+			if (it.name == name)
+			{
+				headers.emplace_back(boost::string_ref(it.value.data(), it.value.size()));
+			}
+		}
+
+		return headers;
+	}
+
+	bool reply::has_header_cs(std::string const& name) const
+	{
+		auto it = std::find_if(headers_.cbegin(), headers_.cend(), [&name](header_t const& hdr)
+		{
+			return hdr.name == name;
+		});
+
+		return it != headers_.cend();
+	}
+
+	std::size_t reply::headers_num_cs(std::string const& name) const
+	{
+		std::size_t num = 0;
+		for (auto const& it : headers_)
+		{
+			if (it.name == name)
+			{
+				++num;
+			}
+		}
+
+		return num;
+	}
+
+	void reply::set_body(std::string body)
+	{
+		if (!has_header("content-length", 14))
+		{
+			add_header("Content-Length", boost::lexical_cast<std::string>(body.size()));
+		}
+
+		content_ = std::move(body);
 	}
 
 }

@@ -153,16 +153,17 @@
     <ClCompile Include="picohttpparser.c" />
     <ClCompile Include="reply.cpp" />
     <ClCompile Include="server.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="connection.hpp" />
-    <ClInclude Include="header.hpp" />
     <ClInclude Include="io_service_pool.hpp" />
     <ClInclude Include="mime_types.hpp" />
     <ClInclude Include="picohttpparser.h" />
     <ClInclude Include="reply.hpp" />
     <ClInclude Include="request.hpp" />
     <ClInclude Include="server.hpp" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
