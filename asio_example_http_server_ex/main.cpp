@@ -25,8 +25,34 @@ int main(int argc, char* argv[])
 		s.request_handler([](const timax::request& req, timax::reply& rep)
 		{
 			//std::cout << req.body() << std::endl;
-			rep.set_status(timax::reply::ok);
-			rep.set_body("Hello World");
+			if (req.path() == "/")
+			{
+				rep.add_header("Content-Type", "text/plain");
+				rep.response_text("Hello World");
+			}
+			else if (req.path() == "/chunked")
+			{
+				rep.add_header("Content-Type", "text/plain");
+				auto chunked_num = std::make_shared<int>(0);
+				rep.response_by_generator([chunked_num]
+				{
+					if (*chunked_num == 10)
+					{
+						*chunked_num = 0;
+						return std::string{};
+					}
+
+					++*chunked_num;
+					return "Hello " + boost::lexical_cast<std::string>(*chunked_num) + "\r\n";
+				});
+			}
+			else if (req.path() == "/file")
+			{
+				if (!rep.response_file("D:\\WinHex\\1"))
+				{
+					rep = timax::reply::stock_reply(timax::reply::not_found);
+				}
+			}
 		});
 
 		s.run();

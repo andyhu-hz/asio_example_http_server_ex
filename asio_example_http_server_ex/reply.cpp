@@ -2,8 +2,13 @@
 #include "reply.hpp"
 
 #include <boost/lexical_cast.hpp>
+#include <boost/filesystem.hpp>
 
 #include <string>
+#include <fcntl.h>
+#ifdef _MSC_VER
+#include <io.h>
+#endif
 
 namespace timax
 {
@@ -90,24 +95,80 @@ namespace timax
 
 		const char name_value_separator[] = { ':', ' ' };
 		const char crlf[] = { '\r', '\n' };
-
 	} // namespace misc_strings
 
-	std::vector<boost::asio::const_buffer> reply::to_buffers()
+	bool reply::to_buffers(std::vector<boost::asio::const_buffer>& buffers)
 	{
-		std::vector<boost::asio::const_buffer> buffers;
-		buffers.reserve(headers_.size() * 4 + 4);
-		buffers.push_back(status_strings::to_buffer(status_));
-		for (auto const& h : headers_)
+		if (!header_buffer_wroted_)
 		{
-			buffers.push_back(boost::asio::buffer(h.name));
-			buffers.push_back(boost::asio::buffer(misc_strings::name_value_separator));
-			buffers.push_back(boost::asio::buffer(h.value));
+			buffers.reserve(headers_.size() * 4 + 5);
+			buffers.emplace_back(status_strings::to_buffer(status_));
+			for (auto const& h : headers_)
+			{
+				buffers.emplace_back(boost::asio::buffer(h.name));
+				buffers.emplace_back(boost::asio::buffer(misc_strings::name_value_separator));
+				buffers.emplace_back(boost::asio::buffer(h.value));
+				buffers.emplace_back(boost::asio::buffer(misc_strings::crlf));
+			}
 			buffers.push_back(boost::asio::buffer(misc_strings::crlf));
+			header_buffer_wroted_ = true;
 		}
-		buffers.push_back(boost::asio::buffer(misc_strings::crlf));
-		buffers.push_back(boost::asio::buffer(content_));
-		return buffers;
+		
+		switch (content_type_)
+		{
+		case reply::none:
+			return true;
+		case reply::string_body:
+			buffers.emplace_back(boost::asio::buffer(content_));
+			return true;
+		case reply::file_body:
+		{
+			content_.resize(1024 * 1024);
+			fs_.read(&content_[0], content_.size());
+			buffers.emplace_back(boost::asio::buffer(content_.data(), fs_.gcount()));
+			return fs_.eof();
+		}
+			break;
+		case reply::chunked_body:
+			content_ = content_gen_();
+			if (content_.empty())
+			{
+				static const std::string chunked_end = "0\r\n\r\n";
+				buffers.emplace_back(boost::asio::buffer(chunked_end));
+				return true;
+			}
+
+			{
+				// chunked编码中分段的长度
+				static const char hex_lookup[] = "0123456789abcdef";
+				size_t content_len = content_.size();
+				int hex_len = 0;
+				if (content_len == 0)
+				{
+					hex_len = 1;
+				}
+				for (auto tmp = content_len; tmp != 0; tmp >>= 4)
+				{
+					++hex_len;
+				}
+
+				chunked_len_buf_[hex_len] = '\r';
+				chunked_len_buf_[hex_len + 1] = '\n';
+
+				auto tmp = hex_len;
+				for (--tmp; tmp >= 0; content_len >>= 4, --tmp)
+				{
+					chunked_len_buf_[tmp] = hex_lookup[content_len & 0xf];
+				}
+				buffers.emplace_back(boost::asio::buffer(chunked_len_buf_, hex_len + 2));
+			}
+			buffers.emplace_back(boost::asio::buffer(content_));
+			buffers.emplace_back(boost::asio::buffer(misc_strings::crlf));
+			return false;
+		default:
+			assert(false);
+			return true;
+		}
 	}
 
 	namespace stock_replies
@@ -235,8 +296,8 @@ namespace timax
 	reply reply::stock_reply(reply::status_type status)
 	{
 		reply rep;
-		rep.status_ = status;
-		rep.content_ = stock_replies::to_string(status);
+		rep.set_status(status);
+		rep.response_text(stock_replies::to_string(status));
 		rep.headers_.resize(2);
 		rep.headers_[0].name = "Content-Length";
 		rep.headers_[0].value = boost::lexical_cast<std::string>(rep.content_.size());
@@ -247,9 +308,13 @@ namespace timax
 
 	void reply::reset()
 	{
-		status_ = bad_request;
+		status_ = reply::ok;
+		header_buffer_wroted_ = false;
+		content_type_ = none;
 		headers_.clear();
 		content_.clear();
+		fs_.close();
+		content_gen_ = {};
 	}
 
 	void reply::set_status(status_type status)
@@ -405,14 +470,50 @@ namespace timax
 		return num;
 	}
 
-	void reply::set_body(std::string body)
+	void reply::response_text(std::string body)
 	{
 		if (!has_header("content-length", 14))
 		{
 			add_header("Content-Length", boost::lexical_cast<std::string>(body.size()));
 		}
 
+		content_type_ = reply::string_body;
 		content_ = std::move(body);
+	}
+
+	bool reply::response_file(std::string const& path)
+	{
+		//TODO: 支持range
+		boost::system::error_code ec;
+		auto size = boost::filesystem::file_size(path, ec);
+		if (ec)
+		{
+			return false;
+		}
+		add_header("Content-Length", boost::lexical_cast<std::string>(size));
+
+		auto last_time = boost::filesystem::last_write_time(path, ec);
+		if (ec)
+		{
+			return false;
+		}
+		add_header("Last-Modified", http_date(last_time));
+
+		fs_.open(path, std::ios::binary | std::ios::in);
+		if (!fs_.is_open())
+		{
+			return false;
+		}
+
+		content_type_ = reply::file_body;
+		return true;
+	}
+
+	void reply::response_by_generator(content_generator_t gen)
+	{
+		content_type_ = reply::chunked_body;
+		add_header("Transfer-Encoding", "chunked");
+		content_gen_ = std::move(gen);
 	}
 
 }

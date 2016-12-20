@@ -7,6 +7,8 @@
 #include <boost/algorithm/string.hpp>
 
 
+#include <iostream>
+
 namespace timax
 {
 	connection::connection(boost::asio::io_service& io_service,
@@ -148,7 +150,16 @@ namespace timax
 
 	void connection::do_write()
 	{
-		boost::asio::async_write(socket_, reply_.to_buffers(),
+		reset_timer();
+		std::vector<boost::asio::const_buffer> buffers;
+		write_finished_ = reply_.to_buffers(buffers);
+		if (buffers.empty())
+		{
+			handle_write(boost::system::error_code{});
+			return;
+		}
+
+		boost::asio::async_write(socket_, buffers,
 			boost::bind(&connection::handle_write, shared_from_this(),
 				boost::asio::placeholders::error));
 	}
@@ -168,7 +179,7 @@ namespace timax
 
 		if (keep_alive_)
 		{
-			reply_.add_header("Connection", "keep-alive" );
+			reply_.add_header("Connection", "keep-alive");
 		}
 		else
 		{
@@ -180,20 +191,26 @@ namespace timax
 
 	void connection::handle_write(const boost::system::error_code& e)
 	{
-		reply_.reset();
 		if (e)
 		{
 			return;
 		}
 
-		if (!keep_alive_)
+		if (write_finished_)
 		{
-			boost::system::error_code ignored_ec;
-			socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
+			reply_.reset();
+
+			if (!keep_alive_)
+			{
+				boost::system::error_code ignored_ec;
+				socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
+				return;
+			}
+
+			start();
 			return;
 		}
-
-		start();
+		do_write();
 	}
 
 	inline bool connection::check_keep_alive()

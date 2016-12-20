@@ -56,6 +56,7 @@ namespace timax
 
 		request request_;
 
+		bool write_finished_;
 		reply reply_;
 
 		bool keep_alive_ = false;

@@ -3,13 +3,16 @@
 
 #include "utils.h"
 #include <boost/asio.hpp>
+#include <boost/function.hpp>
 #include <boost/utility/string_ref.hpp>
 
 #include <string>
 #include <vector>
+#include <fstream>
 
 namespace timax
 {
+	using content_generator_t = boost::function<std::string(void)>;
 	class reply
 	{
 	public:
@@ -39,7 +42,7 @@ namespace timax
 			std::string value;
 		};
 
-		std::vector<boost::asio::const_buffer> to_buffers();
+		bool to_buffers(std::vector<boost::asio::const_buffer>& buffers);
 		static reply stock_reply(status_type status);
 		void reset();
 
@@ -70,10 +73,25 @@ namespace timax
 
 		std::size_t headers_num_cs(std::string const& name) const;
 
-		void set_body(std::string body);
+		void response_text(std::string body);
+		bool response_file(std::string const& path);
+		void response_by_generator(content_generator_t gen);
 	private:
 		std::vector<header_t> headers_;
 		std::string content_;
-		status_type status_;
+		status_type status_ = ok;
+
+		bool header_buffer_wroted_ = false;
+		enum
+		{
+			none,
+			string_body,
+			file_body,
+			chunked_body
+		} content_type_ = none;
+		
+		std::ifstream fs_;
+		char chunked_len_buf_[20];
+		content_generator_t content_gen_;
 	};
 }
