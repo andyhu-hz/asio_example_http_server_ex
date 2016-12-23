@@ -1,10 +1,10 @@
 ﻿
 #pragma once
 
-#include "utils.h"
 #include <boost/asio.hpp>
 #include <boost/function.hpp>
 #include <boost/utility/string_ref.hpp>
+#include <boost/filesystem.hpp>
 
 #include <string>
 #include <vector>
@@ -74,7 +74,7 @@ namespace timax
 		std::size_t headers_num_cs(std::string const& name) const;
 
 		void response_text(std::string body);
-		bool response_file(std::string const& path);
+		bool response_file(boost::filesystem::path path);
 		void response_by_generator(content_generator_t gen);
 	private:
 		std::vector<header_t> headers_;

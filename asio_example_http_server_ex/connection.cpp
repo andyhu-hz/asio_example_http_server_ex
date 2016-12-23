@@ -1,6 +1,7 @@
 
 
 #include "connection.hpp"
+#include "utils.h"
 
 #include <vector>
 #include <boost/bind.hpp>

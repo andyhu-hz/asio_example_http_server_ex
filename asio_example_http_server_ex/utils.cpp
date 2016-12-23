@@ -1,4 +1,6 @@
 #include "utils.h"
+
+#include <boost/filesystem.hpp>
 #include <algorithm>
 #include <cctype>
 #include <ctime>
@@ -82,6 +84,23 @@ namespace timax
 
 		return p;
 	}
+
+
+	reply reply_static_file(std::string const &static_path, request const &req)
+	{
+        if (req.path().find("..") != std::string::npos)
+        {
+            return reply::stock_reply(reply::bad_request);
+        }
+		reply rep;
+		if (rep.response_file((boost::filesystem::path(static_path) / req.path().to_string()).generic_string()))
+		{
+			return rep;
+		}
+		return reply::stock_reply(reply::not_found);
+	}
+
+
 }
 
 

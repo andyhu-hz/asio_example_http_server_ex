@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include "reply.hpp"
+#include "request.hpp"
 
 namespace timax
 {
@@ -31,4 +33,10 @@ namespace timax
 			s[len] = hex_lookup[n & 0xf];
 		}
 	}
+
+    reply reply_static_file(std::string const& static_path, request const& req);
 }
+
+
+
+

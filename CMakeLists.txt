@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 11)
 #add_definitions(-D__SSE4_2__)
 #add_compile_options(-march=broadwell)
 
-find_package(Boost 1.50 COMPONENTS system thread filesystem REQUIRED)
+find_package(Boost 1.55 COMPONENTS system thread filesystem REQUIRED)
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
 
 find_package( Threads )
@@ -20,7 +20,10 @@ set(SOURCE_FILES
         asio_example_http_server_ex/reply.cpp
         asio_example_http_server_ex/server.cpp
         asio_example_http_server_ex/picohttpparser.c
-        asio_example_http_server_ex/utils.cpp)
+        asio_example_http_server_ex/utils.cpp
+        asio_example_http_server_ex/request.cpp)
 
 add_executable(asio_example_http_server ${SOURCE_FILES})
-target_link_libraries(asio_example_http_server ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(asio_example_http_server
+        ${Boost_LIBRARIES}
+        ${CMAKE_THREAD_LIBS_INIT})

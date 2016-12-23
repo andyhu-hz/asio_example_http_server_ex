@@ -1,10 +1,13 @@
 ﻿
-#include <iostream>
-#include <string>
+#include "server.hpp"
+#include "utils.h"
+
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
-#include "server.hpp"
+
+#include <iostream>
+#include <string>
 
 int main(int argc, char* argv[])
 {
@@ -46,12 +49,9 @@ int main(int argc, char* argv[])
 					return "Hello " + boost::lexical_cast<std::string>(*chunked_num) + "\r\n";
 				});
 			}
-			else if (req.path() == "/file")
+			else
 			{
-				if (!rep.response_file("D:\\WinHex\\1"))
-				{
-					rep = timax::reply::stock_reply(timax::reply::not_found);
-				}
+				rep = timax::reply_static_file("./static", req);
 			}
 		});
 

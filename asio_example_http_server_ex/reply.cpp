@@ -1,8 +1,9 @@
 ﻿
 #include "reply.hpp"
+#include "utils.h"
+#include "mime_types.hpp"
 
 #include <boost/lexical_cast.hpp>
-#include <boost/filesystem.hpp>
 
 #include <string>
 #include <fcntl.h>
@@ -482,7 +483,7 @@ namespace timax
 		content_ = std::move(body);
 	}
 
-	bool reply::response_file(std::string const& path)
+	bool reply::response_file(boost::filesystem::path path)
 	{
 		//TODO: 支持range
 		boost::system::error_code ec;
@@ -500,12 +501,13 @@ namespace timax
 		}
 		add_header("Last-Modified", http_date(last_time));
 
-		fs_.open(path, std::ios::binary | std::ios::in);
+		fs_.open(path.generic_string(), std::ios::binary | std::ios::in);
 		if (!fs_.is_open())
 		{
 			return false;
 		}
 
+        add_header("Content-Type", mime_types::extension_to_type(path.extension().c_str()));
 		content_type_ = reply::file_body;
 		return true;
 	}
