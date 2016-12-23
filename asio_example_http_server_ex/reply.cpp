@@ -101,6 +101,7 @@ namespace timax
 	{
 		if (!header_buffer_wroted_)
 		{
+            add_header("Date", http_date(time(nullptr)));
 			buffers.reserve(headers_.size() * 4 + 5);
 			buffers.emplace_back(status_strings::to_buffer(status_));
 			for (auto const& h : headers_)
