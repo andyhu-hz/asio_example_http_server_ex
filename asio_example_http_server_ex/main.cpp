@@ -24,7 +24,7 @@ int main(int argc, char* argv[])
 		}
 
 		std::size_t num_threads = boost::lexical_cast<std::size_t>(argv[3]);
-		timax::server s(argv[1], argv[2], num_threads);
+		timax::server s(num_threads);
 		s.request_handler([](const timax::request& req, timax::reply& rep)
 		{
 			//std::cout << req.body() << std::endl;
@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
 			}
 		});
 
-		s.run();
+		s.listen(argv[1], argv[2]).run();
 	}
 	catch (std::exception& e)
 	{
