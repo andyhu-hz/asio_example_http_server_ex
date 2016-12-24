@@ -10,11 +10,13 @@ set(CMAKE_CXX_STANDARD 11)
 find_package(Boost 1.55 COMPONENTS system thread filesystem REQUIRED)
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
 
+find_package(OpenSSL REQUIRED)
+include_directories(${OPENSSL_INCLUDE_DIR})
+
 find_package( Threads )
 
 set(SOURCE_FILES
         asio_example_http_server_ex/main.cpp
-        asio_example_http_server_ex/connection.cpp
         asio_example_http_server_ex/io_service_pool.cpp
         asio_example_http_server_ex/mime_types.cpp
         asio_example_http_server_ex/reply.cpp
@@ -26,4 +28,5 @@ set(SOURCE_FILES
 add_executable(asio_example_http_server ${SOURCE_FILES})
 target_link_libraries(asio_example_http_server
         ${Boost_LIBRARIES}
-        ${CMAKE_THREAD_LIBS_INIT})
+        ${CMAKE_THREAD_LIBS_INIT}
+        ${OPENSSL_LIBRARIES})

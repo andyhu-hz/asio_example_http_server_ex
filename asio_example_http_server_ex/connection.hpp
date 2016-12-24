@@ -93,7 +93,7 @@ namespace timax
 				buffer_.resize(buffer_.size() + 8192);
 			}
 			socket_.async_read_some(boost::asio::buffer(buffer_.data() + nread_, buffer_.size() - nread_),
-				boost::bind(&connection::handle_read, shared_from_this(),
+				boost::bind(&connection::handle_read, this->shared_from_this(),
 					boost::asio::placeholders::error,
 					boost::asio::placeholders::bytes_transferred));
 		}
@@ -138,7 +138,7 @@ namespace timax
 			}
 
 			boost::asio::async_write(socket_, buffers,
-				boost::bind(&connection::handle_write, shared_from_this(),
+				boost::bind(&connection::handle_write, this->shared_from_this(),
 					boost::asio::placeholders::error));
 		}
 
