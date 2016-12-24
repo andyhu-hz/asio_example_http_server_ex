@@ -507,7 +507,7 @@ namespace timax
 			return false;
 		}
 
-        add_header("Content-Type", mime_types::extension_to_type(path.extension().c_str()));
+        add_header("Content-Type", mime_types::extension_to_type(path.extension().generic_string()));
 		content_type_ = reply::file_body;
 		return true;
 	}
