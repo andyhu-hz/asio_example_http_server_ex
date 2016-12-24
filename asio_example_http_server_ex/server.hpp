@@ -1,10 +1,11 @@
 ﻿
 #pragma once
 
-#include "connection.hpp"
 #include "io_service_pool.hpp"
+#include "connection.hpp"
 
 #include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -19,18 +20,9 @@ namespace timax
 	public:
 		explicit server(std::size_t io_service_pool_size);
 
-		server& listen(const std::string& address, const std::string& port)
-		{
-			boost::asio::ip::tcp::resolver resolver(acceptor_.get_io_service());
-			boost::asio::ip::tcp::resolver::query query(address, port);
-			boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
-			acceptor_.open(endpoint.protocol());
-			acceptor_.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
-			acceptor_.bind(endpoint);
-			acceptor_.listen();
-			start_accept();
-			return *this;
-		}
+		server& listen(const std::string& address, const std::string& port);
+		server& listen(const std::string& address, const std::string& port,
+			const std::string& private_key, const std::string& certificate_chain, bool is_file = true);
 
 		void run();
 
@@ -38,18 +30,19 @@ namespace timax
 		{
 			request_handler_ = std::move(handler);
 		}
+
+		void stop();
+
 	private:
-		void start_accept();
+		void start_accept(boost::shared_ptr<boost::asio::ip::tcp::acceptor> const& acceptor);
+		void start_accept_tls(boost::shared_ptr<boost::asio::ip::tcp::acceptor> const& acceptor);
 
-		void handle_accept(const boost::system::error_code& e);
-
-		void handle_stop();
+		void do_listen(boost::shared_ptr<boost::asio::ip::tcp::acceptor>& acceptor,
+			const std::string& address, const std::string& port);
 
 		io_service_pool io_service_pool_;
 
-		boost::asio::ip::tcp::acceptor acceptor_;
-
-		connection_ptr new_connection_;
+		boost::asio::ssl::context tls_ctx_;;
 
 		request_handler_t request_handler_;
 	};

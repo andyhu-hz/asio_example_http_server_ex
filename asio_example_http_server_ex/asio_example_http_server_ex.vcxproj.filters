@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="connection.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="io_service_pool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
