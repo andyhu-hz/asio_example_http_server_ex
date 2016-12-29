@@ -57,6 +57,7 @@ namespace timax
 		{
 			if (!e)
 			{
+				new_conn->socket().set_option(boost::asio::ip::tcp::no_delay(true));
 				new_conn->start();
 			}
 			else
@@ -76,7 +77,7 @@ namespace timax
 		{
 			if (!e)
 			{
-				//new_conn->socket().set_option(boost::asio::ip::tcp::no_delay(true));
+				new_conn->socket().lowest_layer().set_option(boost::asio::ip::tcp::no_delay(true));
 				new_conn->reset_timer();
 				new_conn->socket().async_handshake(boost::asio::ssl::stream_base::server,
 					[new_conn](const boost::system::error_code &e)
