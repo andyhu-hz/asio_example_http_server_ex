@@ -28,14 +28,12 @@ namespace timax
 	{
 	public:
 		explicit connection(boost::asio::io_service& io_service, request_handler_t& handler)
-			: socket_(io_service), request_handler_(handler),
-			buffer_(8192), deadline_(io_service)
+			: socket_(io_service), request_handler_(handler), deadline_(io_service)
 		{
 		}
 
 		explicit connection(boost::asio::io_service& io_service, request_handler_t& handler, boost::asio::ssl::context& ctx)
-			: socket_(io_service, ctx), request_handler_(handler),
-			buffer_(8192), deadline_(io_service)
+			: socket_(io_service, ctx), request_handler_(handler), deadline_(io_service)
 		{
 		}
 
@@ -46,7 +44,7 @@ namespace timax
 
 		void start()
 		{
-			nread_ = 0;
+			request_.raw_request().size = 0;
 			do_read();
 		}
 
@@ -88,11 +86,12 @@ namespace timax
 		void do_read()
 		{
 			reset_timer();
-			if (buffer_.size() - nread_ < 4096)
+			auto& buf = request_.raw_request();
+			if (buf.remain_size() < 4096)
 			{
-				buffer_.resize(buffer_.size() + 8192);
+				request_.increase_buffer(8192);
 			}
-			socket_.async_read_some(boost::asio::buffer(buffer_.data() + nread_, buffer_.size() - nread_),
+			socket_.async_read_some(boost::asio::buffer(buf.curr_ptr(), buf.remain_size()),
 				boost::bind(&connection::handle_read, this->shared_from_this(),
 					boost::asio::placeholders::error,
 					boost::asio::placeholders::bytes_transferred));
@@ -102,25 +101,22 @@ namespace timax
 		{
 			reset_timer();
 			std::size_t req_len = request_.header_size() + request_.body_len();
-			if (buffer_.size()< req_len)
+			auto& buf = request_.raw_request();
+			if (buf.max_size < req_len)
 			{
-				buffer_.resize(req_len);
+				request_.increase_buffer(req_len - request_.raw_request().max_size);
 			}
 
 			auto self = this->shared_from_this();
-			boost::asio::async_read(socket_, boost::asio::buffer(buffer_.data() + nread_, req_len - nread_),
-				[self, this](boost::system::error_code ec, std::size_t /*length*/)
+			boost::asio::async_read(socket_, boost::asio::buffer(buf.curr_ptr(), req_len - buf.size),
+				[self, this](boost::system::error_code ec, std::size_t length)
 			{
 				if (ec)
 				{
 					return;
 				}
-				/*
-				if (length != request_.header_size() + request_.body_len())
-				{
-				return;
-				}
-				*/
+
+				request_.raw_request().size += length;
 
 				do_request();
 			});
@@ -178,16 +174,17 @@ namespace timax
 				return;
 			}
 
-			size_t last_len = nread_;
-			nread_ += bytes_transferred;
+			auto& buf = request_.raw_request();
+			auto last_len = buf.size;
+			buf.size += bytes_transferred;
 
-			if (nread_ >= 2 * 1024 * 1024)
+			if (buf.size >= 2 * 1024 * 1024)
 			{
 				// 请求过大,断开链接
 				return;
 			}
 
-			int ret = request_.parse(buffer_.data(), nread_, last_len);
+			int ret = request_.parse(last_len);
 
 			if (ret == -1)
 			{
@@ -277,10 +274,6 @@ namespace timax
 		socket_type socket_;
 
 		request_handler_t& request_handler_;
-
-		std::vector<char> buffer_;
-		std::size_t nread_;
-
 
 		request request_;
 

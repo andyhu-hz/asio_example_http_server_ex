@@ -3,14 +3,26 @@
 #include "utils.h"
 
 #include <boost/lexical_cast/try_lexical_convert.hpp>
+#include <cstdlib>
 
 namespace timax
 {
-    int request::parse(const char* data, std::size_t len, std::size_t last_len)
+
+	request::request()
+		:buffer_{static_cast<char*>(std::malloc(8192)), 0, 8192}
+	{
+
+	}
+
+	request::~request()
+	{
+		std::free(buffer_.buffer);
+	}
+
+	int request::parse(std::size_t last_len)
     {
-        data_ = data;
         num_headers_ = sizeof(headers_) / sizeof(headers_[0]);
-        header_size_ = phr_parse_request(data_, len, &method_,
+        header_size_ = phr_parse_request(buffer_.buffer, buffer_.size, &method_,
                                          &method_len_, &path_, &path_len_,
                                          &minor_version_, headers_, &num_headers_, last_len);
 
@@ -145,4 +157,28 @@ namespace timax
 
         return num;
     }
+
+	template<typename T>
+	void fix_offset(T*& ptr, ptrdiff_t offset)
+	{
+		ptr = reinterpret_cast<const char*>(ptr) + offset;
+	}
+
+	void request::increase_buffer(std::size_t size)
+	{
+		auto tmp = static_cast<char*>(std::realloc(buffer_.buffer, buffer_.max_size + size));
+
+		ptrdiff_t offset = tmp - buffer_.buffer;
+		fix_offset(method_, offset);
+		fix_offset(path_, offset);
+		for (auto it = headers_; it != headers_ + num_headers_; ++it)
+		{
+			fix_offset(it->name, offset);
+			fix_offset(it->value, offset);
+		}
+
+		buffer_.buffer = tmp;
+		buffer_.max_size += size;
+	}
+
 }

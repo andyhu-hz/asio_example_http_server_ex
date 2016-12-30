@@ -6,6 +6,7 @@
 
 #include <string>
 #include <vector>
+#include <cassert>
 
 #include "picohttpparser.h"
 
@@ -14,7 +15,10 @@ namespace timax
 	class request
 	{
 	public:
-		int parse(const char* data, std::size_t len, std::size_t last_len);
+		request();
+		~request();
+
+		int parse(std::size_t last_len);
 
 		boost::string_ref method() const
 		{
@@ -82,18 +86,40 @@ namespace timax
 
 		boost::string_ref body() const
 		{
-			return boost::string_ref(data_ + header_size_, body_len_);
+			assert(header_size_ + body_len_ == buffer_.size);
+			return boost::string_ref(buffer_.buffer + header_size_, body_len_);
 		}
 
-		boost::string_ref request_data() const
+		struct buffer_t 
 		{
-			boost::string_ref(data_, header_size_ + body_len_);
+			char* buffer;
+			std::size_t size;
+			std::size_t max_size;
+			std::size_t remain_size()
+			{
+				return max_size - size;
+			}
+			char* curr_ptr()
+			{
+				return buffer + size;
+			}
+		};
+
+		buffer_t const& raw_request() const
+		{
+			return buffer_;
 		}
 
+		buffer_t& raw_request()
+		{
+			return buffer_;
+		}
+
+		void increase_buffer(std::size_t size);
 		int header_size() const { return header_size_; }
 		size_t body_len() const { return body_len_; }
 	private:
-		const char* data_;
+		buffer_t buffer_;
 		const char* method_;
 		size_t method_len_;
 		const char* path_;
