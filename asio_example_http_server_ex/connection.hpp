@@ -65,8 +65,7 @@ namespace timax
 
 					[self, this]()
 					{
-						// TODO:检查是否需要调用do_write()
-						//do_write();
+						// TODO:shutdown
 					}
 				};
 			});
@@ -310,6 +309,7 @@ namespace timax
 		{
 			if (!reply_.header_buffer_wroted())
 			{
+				//TODO:需要完善,添加keep_alive
 				std::vector<boost::asio::const_buffer> buffers;
 				auto finished = reply_.to_buffers(buffers);
 				assert(finished);
