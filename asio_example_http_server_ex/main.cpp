@@ -5,6 +5,7 @@
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/thread.hpp>
 
 #include <iostream>
 #include <string>
@@ -30,8 +31,12 @@ int main(int argc, char* argv[])
 			//std::cout << req.body() << std::endl;
 			if (req.path() == "/")
 			{
-				rep.add_header("Content-Type", "text/plain");
-				rep.response_text("Hello World");
+				auto conn = rep.get_connection();
+				boost::thread thd([conn]() mutable
+				{
+					boost::this_thread::sleep(boost::posix_time::seconds(5));
+					conn.async_write("hello", 5, [](const::boost::system::error_code& ec) {std::cout << ec.message() << std::endl;});
+				});
 			}
 			else if (req.path() == "/chunked")
 			{

@@ -17,6 +17,8 @@
 
 #include <vector>
 
+#include <cassert>
+
 namespace timax
 {
 	using request_handler_t = boost::function<void(const request& req, reply& rep)>;
@@ -30,11 +32,13 @@ namespace timax
 		explicit connection(boost::asio::io_service& io_service, request_handler_t& handler)
 			: socket_(io_service), request_handler_(handler), deadline_(io_service)
 		{
+			request_.raw_request().size = 0;
 		}
 
 		explicit connection(boost::asio::io_service& io_service, request_handler_t& handler, boost::asio::ssl::context& ctx)
 			: socket_(io_service, ctx), request_handler_(handler), deadline_(io_service)
 		{
+			request_.raw_request().size = 0;
 		}
 
 		socket_type&  socket()
@@ -44,7 +48,30 @@ namespace timax
 
 		void start()
 		{
-			request_.raw_request().size = 0;
+			boost::weak_ptr<connection<socket_type>> weak_self = this->shared_from_this();
+			reply_.set_get_connection_func([weak_self, this]
+			{
+				auto self = weak_self.lock();
+				if (!self)
+				{
+					return reply::connection{};
+				}
+
+				return reply::connection
+				{
+					[self, this](const void* data, std::size_t size, reply::async_handler_t handler) {return delay_write(data, size, std::move(handler));},
+
+					[self, this](void* data, std::size_t size, reply::async_handler_t handler) {return delay_read(data, size, handler);},
+
+					[self, this]()
+					{
+						// TODO:检查是否需要调用do_write()
+						//do_write();
+					}
+				};
+			});
+
+
 			do_read();
 		}
 
@@ -126,6 +153,16 @@ namespace timax
 		void do_write()
 		{
 			reset_timer();
+
+			if (keep_alive_)
+			{
+				reply_.add_header("Connection", "keep-alive");
+			}
+			else
+			{
+				reply_.add_header("Connection", "close");
+			}
+
 			std::vector<boost::asio::const_buffer> buffers;
 			write_finished_ = reply_.to_buffers(buffers);
 			if (buffers.empty())
@@ -152,15 +189,11 @@ namespace timax
 				reply_ = reply::stock_reply(reply::bad_request);
 			}
 
-			if (keep_alive_)
+			if (reply_.is_delay())
 			{
-				reply_.add_header("Connection", "keep-alive");
+				//等待延迟操作完成后调用do_write();
+				return;
 			}
-			else
-			{
-				reply_.add_header("Connection", "close");
-			}
-
 			do_write();
 		}
 
@@ -233,7 +266,8 @@ namespace timax
 					return;
 				}
 
-				start();
+				request_.raw_request().size = 0;
+				do_read();
 				return;
 			}
 			do_write();
@@ -270,6 +304,40 @@ namespace timax
 		{
 		}
 
+
+	private:
+		void delay_write(const void* data, std::size_t size, reply::async_handler_t handler)
+		{
+			if (!reply_.header_buffer_wroted())
+			{
+				std::vector<boost::asio::const_buffer> buffers;
+				auto finished = reply_.to_buffers(buffers);
+				assert(finished);
+				auto self = this->shared_from_this();
+				boost::asio::async_write(socket_, buffers,
+					[self, this, data, size, handler](const boost::system::error_code& ec, std::size_t /*length*/)
+				{
+					if (ec)
+					{
+						handler(ec);
+						return;
+					}
+
+					delay_write(data, size, std::move(handler));
+				});
+				return;
+			}
+
+			boost::asio::async_write(socket_,
+				boost::asio::buffer(data, size),
+				boost::bind(handler, boost::asio::placeholders::error));
+		}
+		void delay_read(void* data, std::size_t size, reply::async_handler_t handler)
+		{
+			boost::asio::async_read(socket_,
+				boost::asio::buffer(data, size),
+				boost::bind(handler, boost::asio::placeholders::error));
+		}
 
 	private:
 		socket_type socket_;
