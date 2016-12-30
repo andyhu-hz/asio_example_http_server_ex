@@ -84,11 +84,20 @@ namespace timax
 
 		std::size_t headers_num_cs(std::string const& name) const;
 
+		int header_size() const { return header_size_; }
+
+		bool is_chunked() const
+		{
+			auto val = get_header("transfer-encoding", 17);
+			return val == "chunked";
+		}
+
 		boost::string_ref body() const
 		{
 			assert(header_size_ + body_len_ == buffer_.size);
 			return boost::string_ref(buffer_.buffer + header_size_, body_len_);
 		}
+		size_t body_len() const { return body_len_; }
 
 		struct buffer_t 
 		{
@@ -116,8 +125,7 @@ namespace timax
 		}
 
 		void increase_buffer(std::size_t size);
-		int header_size() const { return header_size_; }
-		size_t body_len() const { return body_len_; }
+
 	private:
 		buffer_t buffer_;
 		const char* method_;

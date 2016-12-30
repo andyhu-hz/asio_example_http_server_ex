@@ -118,6 +118,7 @@ namespace timax
 
 				request_.raw_request().size += length;
 
+				// TODO: ≈–∂œheader÷– «∑Ò”–Content-Type: multipart/form-data
 				do_request();
 			});
 		}
