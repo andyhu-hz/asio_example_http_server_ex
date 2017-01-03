@@ -54,20 +54,28 @@ namespace timax
 				auto self = weak_self.lock();
 				if (!self)
 				{
-					return reply::connection{};
+					return boost::shared_ptr<reply::connection>();
 				}
 
-				return reply::connection
-				{
+				return boost::make_shared<reply::connection>(reply_,
 					[self, this](const void* data, std::size_t size, reply::async_handler_t handler) {return delay_write(data, size, std::move(handler));},
 
 					[self, this](void* data, std::size_t size, reply::async_handler_t handler) {return delay_read(data, size, handler);},
 
 					[self, this]()
 					{
-						// TODO:shutdown
+						reply_.reset();
+
+						if (!keep_alive_)
+						{
+							shutdown(socket_);
+							return;
+						}
+
+						request_.raw_request().size = 0;
+						do_read();
 					}
-				};
+				);
 			});
 
 
@@ -153,14 +161,7 @@ namespace timax
 		{
 			reset_timer();
 
-			if (keep_alive_)
-			{
-				reply_.add_header("Connection", "keep-alive");
-			}
-			else
-			{
-				reply_.add_header("Connection", "close");
-			}
+			check_keep_alive();
 
 			std::vector<boost::asio::const_buffer> buffers;
 			write_finished_ = reply_.to_buffers(buffers);
@@ -177,8 +178,6 @@ namespace timax
 
 		void do_request()
 		{
-			keep_alive_ = check_keep_alive();
-
 			if (request_handler_)
 			{
 				request_handler_(request_, reply_);
@@ -190,7 +189,6 @@ namespace timax
 
 			if (reply_.is_delay())
 			{
-				//等待延迟操作完成后调用do_write();
 				return;
 			}
 			do_write();
@@ -272,26 +270,43 @@ namespace timax
 			do_write();
 		}
 
-		bool check_keep_alive()
+		void check_keep_alive()
 		{
-			auto conn_hdr = request_.get_header("connection", 10);
-			if (request_.is_http1_1())
+			auto rep_conn_hdr = reply_.get_header("connection", 10);
+			if (rep_conn_hdr.empty())
 			{
-				// HTTP1.1
-				//头部中没有包含connection字段
-				//或者头部中包含了connection字段但是值不为close
-				//这种情况是长连接
-				//keep_alive_ = conn_hdr.empty() || !boost::iequals(conn_hdr, "close");
-				return conn_hdr.empty() || !iequal(conn_hdr.data(), conn_hdr.size(), "close", 5);
+				auto req_conn_hdr = request_.get_header("connection", 10);
+				if (request_.is_http1_1())
+				{
+					// HTTP1.1
+					//头部中没有包含connection字段
+					//或者头部中包含了connection字段但是值不为close
+					//这种情况是长连接
+					//keep_alive_ = conn_hdr.empty() || !boost::iequals(conn_hdr, "close");
+					keep_alive_ = req_conn_hdr.empty() || !iequal(req_conn_hdr.data(), req_conn_hdr.size(), "close", 5);
+				}
+				else
+				{
+					//HTTP1.0或其他(0.9 or ?)
+					//头部包含connection,并且connection字段值为keep-alive
+					//这种情况下是长连接
+					//keep_alive_ = !conn_hdr.empty() && boost::iequals(conn_hdr, "keep-alive");
+					keep_alive_ = !req_conn_hdr.empty() && iequal(req_conn_hdr.data(), req_conn_hdr.size(), "keep-alive", 10);
+				}
+
+				if (keep_alive_)
+				{
+					reply_.add_header("Connection", "keep-alive");
+				}
+				else
+				{
+					reply_.add_header("Connection", "close");
+				}
+
+				return;
 			}
-			else
-			{
-				//HTTP1.0或其他(0.9 or ?)
-				//头部包含connection,并且connection字段值为keep-alive
-				//这种情况下是长连接
-				//keep_alive_ = !conn_hdr.empty() && boost::iequals(conn_hdr, "keep-alive");
-				return !conn_hdr.empty() && iequal(conn_hdr.data(), conn_hdr.size(), "keep-alive", 10);
-			}
+
+			keep_alive_ = iequal(rep_conn_hdr.data(), rep_conn_hdr.size(), "keep-alive", 10);
 		}
 
 		void shutdown(boost::asio::ip::tcp::socket const&)
@@ -309,7 +324,8 @@ namespace timax
 		{
 			if (!reply_.header_buffer_wroted())
 			{
-				//TODO:需要完善,添加keep_alive
+				check_keep_alive();
+
 				std::vector<boost::asio::const_buffer> buffers;
 				auto finished = reply_.to_buffers(buffers);
 				assert(finished);

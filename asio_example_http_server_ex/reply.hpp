@@ -27,8 +27,9 @@ namespace timax
 		{
 		public:
 			connection() = default;
-			connection(write_func_t write_func, read_func_t read_func, end_func_t end_func)
-				:write_func_(std::move(write_func)),
+			connection(reply& rep, write_func_t write_func, read_func_t read_func, end_func_t end_func)
+				:rep_(rep),
+				write_func_(std::move(write_func)),
 				read_func_(std::move(read_func)),
 				end_func_(std::move(end_func))
 			{}
@@ -43,18 +44,23 @@ namespace timax
 				read_func_(data, size, std::move(handler));
 			}
 
+			reply& get_reply()
+			{
+				return rep_;
+			}
 			// TODO: chunked write
 			~connection()
 			{
 				end_func_();
 			}
 		private:
+			reply& rep_;
 			write_func_t write_func_;
 			read_func_t read_func_;
 			end_func_t end_func_;
 		};
 
-		using get_connection_func_t = boost::function<connection()>;
+		using get_connection_func_t = boost::function<boost::shared_ptr<connection>()>;
 
 		enum status_type
 		{
@@ -131,7 +137,7 @@ namespace timax
 			get_connection_func_ = std::move(func);
 		}
 
-		connection get_connection(bool delay = true)
+		boost::shared_ptr<connection> get_connection(bool delay = true)
 		{
 			set_delay(delay);
 			return get_connection_func_();

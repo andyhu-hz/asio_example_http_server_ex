@@ -31,11 +31,21 @@ int main(int argc, char* argv[])
 			//std::cout << req.body() << std::endl;
 			if (req.path() == "/")
 			{
+				rep.add_header("Content-Type", "text/plain");
+				rep.response_text("Hello World");
+			}
+			else if (req.path() == "/delay")
+			{
 				auto conn = rep.get_connection();
 				boost::thread thd([conn]() mutable
 				{
 					boost::this_thread::sleep(boost::posix_time::seconds(5));
-					conn.async_write("hello", 5, [](const::boost::system::error_code& ec) {std::cout << ec.message() << std::endl;});
+					conn->get_reply().add_header("Content-Type", "text/plain");
+					conn->get_reply().add_header("Content-Length", "5");
+					conn->async_write("hello", 5, [conn](const::boost::system::error_code& ec)
+					{
+						std::cout << ec.message() << std::endl;
+					});
 				});
 			}
 			else if (req.path() == "/chunked")
