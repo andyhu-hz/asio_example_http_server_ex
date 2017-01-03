@@ -34,16 +34,20 @@ namespace timax
 				end_func_(std::move(end_func))
 			{}
 
-			void async_write(const void* data, std::size_t size, async_handler_t handler)
+			void async_write(const void* data, std::size_t size, async_handler_t handler) const
 			{
 				write_func_(data, size, std::move(handler));
 			}
 
-			void async_read(void* data, std::size_t size, async_handler_t handler)
+			void async_read(void* data, std::size_t size, async_handler_t handler) const
 			{
 				read_func_(data, size, std::move(handler));
 			}
 
+			reply const& get_reply() const
+			{
+				return rep_;
+			}
 			reply& get_reply()
 			{
 				return rep_;
