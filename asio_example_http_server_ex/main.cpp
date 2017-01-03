@@ -42,12 +42,24 @@ int main(int argc, char* argv[])
 					boost::this_thread::sleep(boost::posix_time::seconds(5));
 					conn->get_reply().add_header("Content-Type", "text/plain");
 					conn->get_reply().add_header("Content-Length", "5");
+					// Warning: async_write不能与rep的response_text response_file response_by_generator一起使用
 					conn->async_write("hello", 5, [conn](const::boost::system::error_code& ec)
 					{
 						std::cout << ec.message() << std::endl;
 					});
 				});
 			}
+			else if (req.path() == "/delay2")
+			{
+				auto conn = rep.get_connection();
+				boost::thread thd([conn]() mutable
+				{
+					boost::this_thread::sleep(boost::posix_time::seconds(5));
+					conn->get_reply().add_header("Content-Type", "text/plain");
+					conn->get_reply().response_text("Hello World");
+				});
+			}
+
 			else if (req.path() == "/chunked")
 			{
 				rep.add_header("Content-Type", "text/plain");

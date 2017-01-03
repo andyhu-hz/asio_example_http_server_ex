@@ -144,19 +144,23 @@ namespace timax
 		}
 
 		bool header_buffer_wroted() const { return header_buffer_wroted_; }
+
+		enum body_type_t
+		{
+			none,
+			string_body,
+			file_body,
+			chunked_body
+		};
+
+		body_type_t body_type() { return body_type_; }
 	private:
 		std::vector<header_t> headers_;
 		std::string content_;
 		status_type status_ = ok;
 
 		bool header_buffer_wroted_ = false;
-		enum
-		{
-			none,
-			string_body,
-			file_body,
-			chunked_body
-		} content_type_ = none;
+		body_type_t body_type_ = none;
 		
 		std::ifstream fs_;
 		char chunked_len_buf_[20];

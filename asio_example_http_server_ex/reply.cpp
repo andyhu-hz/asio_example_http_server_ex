@@ -116,7 +116,7 @@ namespace timax
 			header_buffer_wroted_ = true;
 		}
 		
-		switch (content_type_)
+		switch (body_type_)
 		{
 		case reply::none:
 			return true;
@@ -312,7 +312,7 @@ namespace timax
 	{
 		status_ = reply::ok;
 		header_buffer_wroted_ = false;
-		content_type_ = none;
+		body_type_ = none;
 		headers_.clear();
 		content_.clear();
 		fs_.close();
@@ -479,7 +479,7 @@ namespace timax
 			add_header("Content-Length", boost::lexical_cast<std::string>(body.size()));
 		}
 
-		content_type_ = reply::string_body;
+		body_type_ = reply::string_body;
 		content_ = std::move(body);
 	}
 
@@ -508,13 +508,13 @@ namespace timax
 		}
 
         add_header("Content-Type", mime_types::extension_to_type(path.extension().generic_string()));
-		content_type_ = reply::file_body;
+		body_type_ = reply::file_body;
 		return true;
 	}
 
 	void reply::response_by_generator(content_generator_t gen)
 	{
-		content_type_ = reply::chunked_body;
+		body_type_ = reply::chunked_body;
 		add_header("Transfer-Encoding", "chunked");
 		content_gen_ = std::move(gen);
 	}

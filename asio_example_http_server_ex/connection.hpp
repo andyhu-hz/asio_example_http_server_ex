@@ -64,6 +64,12 @@ namespace timax
 
 					[self, this]()
 					{
+						if (reply_.body_type() != reply::none)
+						{
+							do_write();
+							return;
+						}
+
 						reply_.reset();
 
 						if (!keep_alive_)
@@ -322,10 +328,11 @@ namespace timax
 	private:
 		void delay_write(const void* data, std::size_t size, reply::async_handler_t handler)
 		{
+			reset_timer();
 			if (!reply_.header_buffer_wroted())
 			{
 				check_keep_alive();
-
+				assert(reply_.body_type() == reply::none);
 				std::vector<boost::asio::const_buffer> buffers;
 				auto finished = reply_.to_buffers(buffers);
 				assert(finished);
@@ -350,6 +357,7 @@ namespace timax
 		}
 		void delay_read(void* data, std::size_t size, reply::async_handler_t handler)
 		{
+			reset_timer();
 			boost::asio::async_read(socket_,
 				boost::asio::buffer(data, size),
 				boost::bind(handler, boost::asio::placeholders::error));
