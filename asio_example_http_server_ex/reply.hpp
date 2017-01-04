@@ -38,12 +38,12 @@ namespace timax
 				read_chunk_func_(std::move(read_chunk_func)), read_some_func_(std::move(read_some_func)), end_func_(std::move(end_func))
 			{}
 
-			void async_write(const void* data, std::size_t size, async_handler_t handler)
+			void async_write(const void* data, std::size_t size, async_handler_t handler) const
 			{
 				write_func_(data, size, std::move(handler));
 			}
 
-			void async_read(void* data, std::size_t size, async_handler_t handler)
+			void async_read(void* data, std::size_t size, async_handler_t handler) const
 			{
 				read_func_(data, size, std::move(handler));
 			}
@@ -56,6 +56,10 @@ namespace timax
 			void async_read_chunk(chunked_handler_t handler)
 			{
 				read_chunk_func_(handler);
+			}
+			reply const& get_reply() const
+			{
+				return rep_;
 			}
 			reply& get_reply()
 			{
