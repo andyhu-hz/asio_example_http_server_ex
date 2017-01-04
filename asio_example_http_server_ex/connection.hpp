@@ -62,6 +62,10 @@ namespace timax
 
 					[self, this](void* data, std::size_t size, reply::async_handler_t handler) {return delay_read(data, size, handler);},
 
+					[self, this](void* data, std::size_t size, reply::async_handler_t handler) {return delay_read_some(data, size, handler);},
+
+					[self, this](reply::chunked_handler_t handler) {return delay_read_chunk(handler);},
+
 					[self, this]()
 					{
 						if (reply_.body_type() != reply::none)
@@ -342,7 +346,7 @@ namespace timax
 				{
 					if (ec)
 					{
-						handler(ec);
+						handler(ec, 0);
 						return;
 					}
 
@@ -351,17 +355,51 @@ namespace timax
 				return;
 			}
 
-			boost::asio::async_write(socket_,
-				boost::asio::buffer(data, size),
-				boost::bind(handler, boost::asio::placeholders::error));
+			boost::asio::async_write(socket_, boost::asio::buffer(data, size), handler);
 		}
+
 		void delay_read(void* data, std::size_t size, reply::async_handler_t handler)
 		{
 			reset_timer();
-			boost::asio::async_read(socket_,
-				boost::asio::buffer(data, size),
-				boost::bind(handler, boost::asio::placeholders::error));
+			boost::asio::async_read(socket_, boost::asio::buffer(data, size), handler);
 		}
+
+		void delay_read_some(void* data, std::size_t size, reply::async_handler_t handler)
+		{
+			reset_timer();
+			socket_.async_read_some(boost::asio::buffer(data, size), handler);
+		}
+
+		void delay_read_chunk(reply::chunked_handler_t handler)
+		{
+			auto& buf = request_.raw_request();
+			if (buf.size > request_.header_size())
+			{
+				std::size_t remain_size = buf.size - request_.header_size();
+				auto chunk_start = buf.buffer + request_.header_size();
+				auto ret = phr_decode_chunked(&chunked_dec_, chunk_start, &remain_size);
+				handler(boost::string_ref(chunk_start, remain_size), ret);
+				buf.size = request_.header_size();
+				return;
+			}
+
+
+			chunked_buf_.resize(2 * 1024 * 1024);
+			delay_read_some(&chunked_buf_[0], chunked_buf_.size(),
+				[this, handler](const boost::system::error_code& ec, std::size_t length)
+			{
+				if (ec)
+				{
+					handler(boost::string_ref(), -1);
+					return;
+				}
+
+				auto ret = phr_decode_chunked(&chunked_dec_, &chunked_buf_[0], &length);
+				handler(boost::string_ref(chunked_buf_.data(), length), ret);
+			});
+
+		}
+
 
 	private:
 		socket_type socket_;
@@ -369,6 +407,9 @@ namespace timax
 		request_handler_t& request_handler_;
 
 		request request_;
+
+		std::string chunked_buf_;
+		phr_chunked_decoder chunked_dec_ = { 0 };
 
 		bool write_finished_;
 		reply reply_;

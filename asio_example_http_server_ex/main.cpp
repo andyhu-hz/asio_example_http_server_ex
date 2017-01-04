@@ -10,6 +10,30 @@
 #include <iostream>
 #include <string>
 
+void reead_chunk(boost::shared_ptr<timax::reply::connection> conn)
+{
+	conn->async_read_chunk([conn](boost::string_ref data, intptr_t result)
+	{
+		if (result == -1)
+		{
+			std::cout << "Read chunked error" << std::endl;
+			return;
+		}
+
+		std::cout << "chunked: " << data << std::endl;
+		if (result == -2)
+		{
+			reead_chunk(conn);
+		}
+		else
+		{
+			std::cout << "chunked over" << std::endl;
+			conn->get_reply().add_header("Content-Type", "text/plain");
+			conn->get_reply().response_text("Success");
+		}
+	});
+}
+
 int main(int argc, char* argv[])
 {
 	try
@@ -43,7 +67,7 @@ int main(int argc, char* argv[])
 					conn->get_reply().add_header("Content-Type", "text/plain");
 					conn->get_reply().add_header("Content-Length", "5");
 					// Warning: async_write不能与rep的response_text response_file response_by_generator一起使用
-					conn->async_write("hello", 5, [conn](const::boost::system::error_code& ec)
+					conn->async_write("hello", 5, [conn](const::boost::system::error_code& ec, std::size_t /*length*/)
 					{
 						std::cout << ec.message() << std::endl;
 					});
@@ -59,7 +83,6 @@ int main(int argc, char* argv[])
 					conn->get_reply().response_text("Hello World");
 				});
 			}
-
 			else if (req.path() == "/chunked")
 			{
 				rep.add_header("Content-Type", "text/plain");
@@ -76,6 +99,19 @@ int main(int argc, char* argv[])
 					return "Hello " + boost::lexical_cast<std::string>(*chunked_num) + "\r\n";
 				});
 			}
+			else if (req.path() == "/chunked_req")
+			{
+				if (req.is_chunked())
+				{
+					auto conn = rep.get_connection();
+					reead_chunk(conn);
+				}
+				else
+				{
+					rep = timax::reply::stock_reply(timax::reply::not_found);
+				}
+			}
+
 			else
 			{
 				rep = timax::reply_static_file("./static", req);

@@ -10,6 +10,8 @@
 #include <vector>
 #include <fstream>
 
+#include "picohttpparser.h"
+
 namespace timax
 {
 	using content_generator_t = boost::function<std::string(void)>;
@@ -18,20 +20,22 @@ namespace timax
 	{
 	public:
 
-		using async_handler_t = boost::function<void(const boost::system::error_code&)>;
+		using async_handler_t = boost::function<void(const boost::system::error_code&, std::size_t)>;
+		using chunked_handler_t = boost::function<void(boost::string_ref, intptr_t)>;
+
 		using write_func_t = boost::function<void(const void*, std::size_t, async_handler_t)>;
 		using read_func_t = boost::function<void(void*, std::size_t, async_handler_t)>;
+		using read_chunk_func_t = boost::function<void(chunked_handler_t)>;
 		using end_func_t = boost::function<void()>;
 
 		class connection
 		{
 		public:
 			connection() = default;
-			connection(reply& rep, write_func_t write_func, read_func_t read_func, end_func_t end_func)
-				:rep_(rep),
-				write_func_(std::move(write_func)),
-				read_func_(std::move(read_func)),
-				end_func_(std::move(end_func))
+			connection(reply& rep, write_func_t write_func, read_func_t read_func,
+				read_func_t read_some_func, read_chunk_func_t read_chunk_func, end_func_t end_func)
+				:rep_(rep), write_func_(std::move(write_func)), read_func_(std::move(read_func)),
+				read_chunk_func_(std::move(read_chunk_func)), read_some_func_(std::move(read_some_func)), end_func_(std::move(end_func))
 			{}
 
 			void async_write(const void* data, std::size_t size, async_handler_t handler)
@@ -44,6 +48,15 @@ namespace timax
 				read_func_(data, size, std::move(handler));
 			}
 
+			void async_read_some(void* data, std::size_t size, async_handler_t handler)
+			{
+				read_some_func_(data, size, handler);
+			}
+
+			void async_read_chunk(chunked_handler_t handler)
+			{
+				read_chunk_func_(handler);
+			}
 			reply& get_reply()
 			{
 				return rep_;
@@ -57,6 +70,8 @@ namespace timax
 			reply& rep_;
 			write_func_t write_func_;
 			read_func_t read_func_;
+			read_func_t read_some_func_;
+			read_chunk_func_t read_chunk_func_;
 			end_func_t end_func_;
 		};
 

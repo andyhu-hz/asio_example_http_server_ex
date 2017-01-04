@@ -94,7 +94,7 @@ namespace timax
 
 		boost::string_ref body() const
 		{
-			assert(header_size_ + body_len_ == buffer_.size);
+// 			assert(header_size_ + body_len_ == buffer_.size);
 			return boost::string_ref(buffer_.buffer + header_size_, body_len_);
 		}
 		size_t body_len() const { return body_len_; }
