@@ -161,6 +161,7 @@
     <ClCompile Include="io_service_pool.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mime_types.cpp" />
+    <ClCompile Include="multipart_parser.c" />
     <ClCompile Include="picohttpparser.c" />
     <ClCompile Include="reply.cpp" />
     <ClCompile Include="request.cpp" />
@@ -171,6 +172,7 @@
     <ClInclude Include="connection.hpp" />
     <ClInclude Include="io_service_pool.hpp" />
     <ClInclude Include="mime_types.hpp" />
+    <ClInclude Include="multipart_parser.h" />
     <ClInclude Include="picohttpparser.h" />
     <ClInclude Include="reply.hpp" />
     <ClInclude Include="request.hpp" />

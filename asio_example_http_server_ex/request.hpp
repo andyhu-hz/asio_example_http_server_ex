@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include "picohttpparser.h"
+#include "multipart_parser.h"
 
 namespace timax
 {
@@ -19,6 +20,8 @@ namespace timax
 		~request();
 
 		int parse(std::size_t last_len);
+
+		bool parse_multipart();
 
 		boost::string_ref method() const
 		{
@@ -126,6 +129,47 @@ namespace timax
 
 		void increase_buffer(std::size_t size);
 
+
+		class form_parts_t
+		{
+		public:
+			std::vector<std::pair<std::string, std::string>> const& meta() const { return meta_; }
+			std::string const& data() const { return data_; }
+
+			struct content_disposition_t
+			{
+				std::string content_type;
+				std::vector<std::pair<std::string, std::string>> pairs;
+				std::string get(std::string const& name) const
+				{
+					for (auto& it : pairs)
+					{
+						if (it.first == name)
+						{
+							return it.second;
+						}
+					}
+
+					return{};
+				}
+				std::string get_filename() const
+				{
+					return get("filename");
+				}
+			};
+			content_disposition_t const& content_disposition() const { return content_disposition_; }
+		private:
+			friend request;
+			std::vector<std::pair<std::string,std::string>> meta_;
+			content_disposition_t content_disposition_;
+
+			int state_ = 0;
+			std::string curr_field_;
+			std::string curr_value_;
+			std::string data_;
+		};
+
+		std::vector<form_parts_t> const& form_data() const { return form_data_; }
 	private:
 		buffer_t buffer_;
 		const char* method_;
@@ -138,6 +182,10 @@ namespace timax
 
 		int header_size_;
 		size_t body_len_;
+
+		multipart_parser* multipart_parser_ = nullptr;
+		multipart_parser_settings multipart_parser_settings_ = {0};
+		std::vector<form_parts_t> form_data_;
 	};
 }
 

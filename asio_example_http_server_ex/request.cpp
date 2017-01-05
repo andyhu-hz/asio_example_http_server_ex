@@ -3,7 +3,10 @@
 #include "utils.h"
 
 #include <boost/lexical_cast/try_lexical_convert.hpp>
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/regex.hpp>
 #include <cstdlib>
+#include <iostream>
 
 namespace timax
 {
@@ -16,6 +19,10 @@ namespace timax
 
 	request::~request()
 	{
+		if (multipart_parser_)
+		{
+			multipart_parser_free(multipart_parser_);
+		}
 		std::free(buffer_.buffer);
 	}
 
@@ -37,7 +44,214 @@ namespace timax
         return header_size_;
     }
 
-    boost::string_ref request::get_header(const char* name, size_t size) const
+	namespace parser
+	{
+		std::string get_content_type(std::string::iterator& begin, std::string::iterator end)
+		{
+			std::string content_type;
+			for (; begin != end; ++begin)
+			{
+				char c = *begin;
+				if (c == ';')
+				{
+					boost::algorithm::trim(content_type);
+					++begin;
+					return content_type;
+				}
+				content_type.push_back(c);
+			}
+
+			return content_type;
+		}
+
+		std::string get_pair(std::string::iterator& begin, std::string::iterator end)
+		{
+			return get_content_type(begin, end);
+		}
+
+		std::string get_pair_name(std::string::iterator& begin, std::string::iterator end)
+		{
+			std::string name;
+			for (; begin != end; ++begin)
+			{
+				char c = *begin;
+				if (c == '=')
+				{
+					boost::algorithm::trim(name);
+					++begin;
+					return name;
+				}
+				name.push_back(c);
+			}
+
+			return name;
+		}
+		std::string get_pair_value(std::string::iterator& begin, std::string::iterator end)
+		{
+			std::string value;
+			bool has_first_quo = false;
+			for (; begin != end; ++begin)
+			{
+				char c = *begin;
+				if (c == '"')
+				{
+					if (!has_first_quo)
+					{
+						has_first_quo = true;
+						continue;
+					}
+					boost::algorithm::trim(value);
+					++begin;
+					return value;
+				}
+
+				value.push_back(c);
+			}
+
+			return value;
+		}
+
+		request::form_parts_t::content_disposition_t parse_content_disposition(std::string str)
+		{
+			auto start = str.begin();
+			auto end = str.end();
+			request::form_parts_t::content_disposition_t content_disposition;
+			content_disposition.content_type = get_content_type(start, end);
+			while (start != end)
+			{
+				auto pair = get_pair(start, end);
+				auto pair_start = pair.begin();
+				auto pair_end = pair.end();
+				auto name = get_pair_name(pair_start, pair_end);
+				auto value = get_pair_value(pair_start, pair_end);
+				content_disposition.pairs.emplace_back(name, value);
+			}
+
+			return content_disposition;
+		}
+	}
+
+	bool request::parse_multipart()
+	{
+		if (!multipart_parser_)
+		{
+			// »ñÈ¡boundary
+			auto content_type = get_header("Content-Type", 12).to_string();
+			if (content_type.empty())
+			{
+				return false;
+			}
+
+			auto pos = content_type.find(';');
+			if (pos == std::string::npos)
+			{
+				return false;
+			}
+
+			pos = content_type.find("boundary", pos);
+			pos += 8;
+			if (pos == std::string::npos || pos >= content_type.size())
+			{
+				return false;
+			}
+
+			bool equ_found = false;
+			for (;pos < content_type.size(); ++pos)
+			{
+				if (content_type[pos] == '=')
+				{
+					if (equ_found)
+					{
+						return false;
+					}
+					equ_found = true;
+					continue;
+				}
+
+				if (content_type[pos] != ' ')
+				{
+					break;
+				}
+			}
+			if (!equ_found)
+			{
+				return false;
+			}
+
+			auto boundary = "--" + content_type.substr(pos, content_type.size() - pos);
+
+			multipart_parser_settings_.on_part_data_begin = [](multipart_parser* p)
+			{
+				std::cout << "begin" << std::endl;
+				auto self = static_cast<request*>(multipart_parser_get_data(p));
+				self->form_data_.emplace_back(form_parts_t{});
+				return 0;
+			};
+			multipart_parser_settings_.on_header_field = [](multipart_parser* p, const char *at, size_t length)
+			{
+				auto self = static_cast<request*>(multipart_parser_get_data(p));
+				auto& part = self->form_data_.back();
+				if (part.state_ == 1)
+				{
+					if (iequal(part.curr_field_.data(), part.curr_field_.size(), "Content-Disposition", 19))
+					{
+						part.content_disposition_ = parser::parse_content_disposition(part.curr_value_);
+					}
+
+					part.meta_.emplace_back(part.curr_field_, part.curr_value_);
+					part.state_ = 0;
+
+					part.curr_field_.clear();
+					part.curr_value_.clear();
+				}
+				
+				part.curr_field_ += std::string(at, length);
+				return 0;
+			};
+			multipart_parser_settings_.on_header_value = [](multipart_parser* p, const char *at, size_t length)
+			{
+				auto self = static_cast<request*>(multipart_parser_get_data(p));
+				auto& part = self->form_data_.back();
+				part.state_ = 1;
+				part.curr_value_ += std::string(at, length);
+				return 0;
+			};
+			multipart_parser_settings_.on_headers_complete = [](multipart_parser* p)
+			{
+				auto self = static_cast<request*>(multipart_parser_get_data(p));
+				auto& part = self->form_data_.back();
+				assert(part.state_ == 1);
+				part.meta_.emplace_back(part.curr_field_, part.curr_value_);
+				return 0;
+			};
+			multipart_parser_settings_.on_part_data = [](multipart_parser* p, const char *at, size_t length)
+			{
+				auto self = static_cast<request*>(multipart_parser_get_data(p));
+				auto& part = self->form_data_.back();
+				part.data_ += std::string(at, length);
+
+				return 0;
+			};
+
+// 			multipart_parser_settings_.on_part_data_end = [](multipart_parser*)
+// 			{
+// 				std::cout << "*****************on_part_data_end********************************" << std::endl;
+// 				return 0;
+// 			};
+// 			multipart_parser_settings_.on_body_end = [](multipart_parser*)
+// 			{
+// 				std::cout << "*****************on_body_end********************************" << std::endl;
+// 				return 0;
+// 			};
+
+			multipart_parser_ = multipart_parser_init(boundary.c_str(), &multipart_parser_settings_);
+			multipart_parser_set_data(multipart_parser_, this);
+		}
+
+		return multipart_parser_execute(multipart_parser_, body().data(), body().size()) != 0;//== body().size();
+	}
+
+	boost::string_ref request::get_header(const char* name, size_t size) const
     {
         auto it = std::find_if(headers_, headers_ + num_headers_, [this, name, size](struct phr_header const& hdr)
         {

@@ -163,7 +163,11 @@ namespace timax
 
 				request_.raw_request().size += length;
 
-				// TODO: ≈–∂œheader÷– «∑Ò”–Content-Type: multipart/form-data
+				auto content_type = request_.get_header("Content-Type", 12);
+				if (!content_type.empty() && content_type.find("multipart/form-data") != boost::string_ref::npos)
+				{
+					request_.parse_multipart();
+				}
 				do_request();
 			});
 		}

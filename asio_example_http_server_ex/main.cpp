@@ -8,6 +8,8 @@
 #include <boost/thread.hpp>
 
 #include <iostream>
+#include <fstream>
+#include <atomic>
 #include <string>
 
 void reead_chunk(boost::shared_ptr<timax::reply::connection> conn)
@@ -111,7 +113,26 @@ int main(int argc, char* argv[])
 					rep = timax::reply::stock_reply(timax::reply::not_found);
 				}
 			}
+			else if (req.path() == "/fileupload.php")
+			{
+				for (auto part : req.form_data())
+				{
+					std::cout << "***************************************************************************************" << std::endl;
+					for (auto meta : part.meta())
+					{
+						std::cout << meta.first << ": " << meta.second << std::endl;
+					}
 
+					auto filename = part.content_disposition().get("filename");
+					if (!filename.empty())
+					{
+						std::ofstream ofs(filename, std::ios::binary | std::ios::out);
+						ofs.write(part.data().data(), part.data().size());
+					}
+				}
+
+				rep = timax::reply::stock_reply(timax::reply::ok);
+			}
 			else
 			{
 				rep = timax::reply_static_file("./static", req);
