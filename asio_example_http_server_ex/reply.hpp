@@ -111,6 +111,10 @@ namespace timax
 		static reply stock_reply(status_type status);
 		void reset();
 
+		status_type status()
+		{
+			return status_;
+		}
 		void set_status(status_type status);
 		std::vector<header_t>& headers();
 		std::vector<header_t> const& headers() const;

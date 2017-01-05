@@ -174,6 +174,8 @@ namespace timax
 
 			check_keep_alive();
 
+			assert(reply_.headers_num("Content-Length", 14) == 1);
+
 			std::vector<boost::asio::const_buffer> buffers;
 			write_finished_ = reply_.to_buffers(buffers);
 			if (buffers.empty())
@@ -195,7 +197,7 @@ namespace timax
 			}
 			else
 			{
-				reply_ = reply::stock_reply(reply::bad_request);
+				reply_ = reply::stock_reply(reply::not_found);
 			}
 
 			if (reply_.is_delay())
