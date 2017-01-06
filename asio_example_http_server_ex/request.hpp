@@ -6,6 +6,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <cassert>
 
 #include "picohttpparser.h"
@@ -19,9 +20,10 @@ namespace timax
 		request();
 		~request();
 
-		int parse(std::size_t last_len);
+		int parse_header(std::size_t last_len);
 
-		bool parse_multipart();
+		bool parse_form_multipart();
+		bool parse_form_urlencoded();
 
 		boost::string_ref method() const
 		{
@@ -139,18 +141,12 @@ namespace timax
 			struct content_disposition_t
 			{
 				std::string content_type;
-				std::vector<std::pair<std::string, std::string>> pairs;
+				std::map<std::string, std::string> pairs;
 				std::string get(std::string const& name) const
 				{
-					for (auto& it : pairs)
-					{
-						if (it.first == name)
-						{
-							return it.second;
-						}
-					}
+					auto it = pairs.find(name);
 
-					return{};
+					return it == pairs.end() ? std::string{}: it->second;
 				}
 				std::string get_filename() const
 				{
@@ -169,7 +165,8 @@ namespace timax
 			std::string data_;
 		};
 
-		std::vector<form_parts_t> const& form_data() const { return form_data_; }
+		std::vector<form_parts_t> const& multipart_form_data() const { return multipart_form_data_; }
+		std::map<std::string, std::string> const& urlencoded_form_data() const { return urlencoded_form_data_; }
 	private:
 		buffer_t buffer_;
 		const char* method_;
@@ -185,7 +182,9 @@ namespace timax
 
 		multipart_parser* multipart_parser_ = nullptr;
 		multipart_parser_settings multipart_parser_settings_ = {0};
-		std::vector<form_parts_t> form_data_;
+		std::vector<form_parts_t> multipart_form_data_;
+
+		std::map<std::string, std::string> urlencoded_form_data_;
 	};
 }
 

@@ -6,6 +6,7 @@
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
+#include <boost/locale.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -115,7 +116,15 @@ int main(int argc, char* argv[])
 			}
 			else if (req.path() == "/fileupload.php")
 			{
-				for (auto part : req.form_data())
+				for (auto pair : req.urlencoded_form_data())
+				{
+					std::cout
+						<< boost::locale::conv::between(pair.first,"GB2312", "UTF-8")
+						<< ":"
+						<< boost::locale::conv::between(pair.second, "GB2312", "UTF-8")
+						<< std::endl;
+				}
+				for (auto part : req.multipart_form_data())
 				{
 					std::cout << "***************************************************************************************" << std::endl;
 					for (auto meta : part.meta())

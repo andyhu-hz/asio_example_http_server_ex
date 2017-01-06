@@ -35,6 +35,25 @@ namespace timax
 	}
 
     reply reply_static_file(std::string const& static_path, request const& req);
+
+	inline int htoi(int c1, int c2)
+	{
+		int value;
+		int c;
+
+		c = c1;
+		if (isupper(c))
+			c = tolower(c);
+		value = (c >= '0' && c <= '9' ? c - '0' : c - 'a' + 10) * 16;
+
+		c = c2;
+		if (isupper(c))
+			c = tolower(c);
+		value += c >= '0' && c <= '9' ? c - '0' : c - 'a' + 10;
+
+		return (value);
+	}
+
 }
 
 

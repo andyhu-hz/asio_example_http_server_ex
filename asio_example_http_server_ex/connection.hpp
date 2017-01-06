@@ -164,9 +164,17 @@ namespace timax
 				request_.raw_request().size += length;
 
 				auto content_type = request_.get_header("Content-Type", 12);
-				if (!content_type.empty() && content_type.find("multipart/form-data") != boost::string_ref::npos)
+				if (!content_type.empty())
 				{
-					request_.parse_multipart();
+					if (content_type.find("application/x-www-form-urlencoded") != boost::string_ref::npos)
+					{
+						request_.parse_form_urlencoded();	//TODO:Ω‚Œˆ ß∞‹?
+					}
+					else if (content_type.find("multipart/form-data") != boost::string_ref::npos)
+					{
+						request_.parse_form_multipart();	//TODO:Ω‚Œˆ ß∞‹?
+					}
+
 				}
 				do_request();
 			});
@@ -232,7 +240,7 @@ namespace timax
 				return;
 			}
 
-			int ret = request_.parse(last_len);
+			int ret = request_.parse_header(last_len);
 
 			if (ret == -1)
 			{

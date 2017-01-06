@@ -26,7 +26,7 @@ namespace timax
 		std::free(buffer_.buffer);
 	}
 
-	int request::parse(std::size_t last_len)
+	int request::parse_header(std::size_t last_len)
     {
         num_headers_ = sizeof(headers_) / sizeof(headers_[0]);
         header_size_ = phr_parse_request(buffer_.buffer, buffer_.size, &method_,
@@ -124,14 +124,14 @@ namespace timax
 				auto pair_end = pair.end();
 				auto name = get_pair_name(pair_start, pair_end);
 				auto value = get_pair_value(pair_start, pair_end);
-				content_disposition.pairs.emplace_back(name, value);
+				content_disposition.pairs.emplace(name, value);
 			}
 
 			return content_disposition;
 		}
 	}
 
-	bool request::parse_multipart()
+	bool request::parse_form_multipart()
 	{
 		if (!multipart_parser_)
 		{
@@ -184,13 +184,13 @@ namespace timax
 			{
 				std::cout << "begin" << std::endl;
 				auto self = static_cast<request*>(multipart_parser_get_data(p));
-				self->form_data_.emplace_back(form_parts_t{});
+				self->multipart_form_data_.emplace_back(form_parts_t{});
 				return 0;
 			};
 			multipart_parser_settings_.on_header_field = [](multipart_parser* p, const char *at, size_t length)
 			{
 				auto self = static_cast<request*>(multipart_parser_get_data(p));
-				auto& part = self->form_data_.back();
+				auto& part = self->multipart_form_data_.back();
 				if (part.state_ == 1)
 				{
 					if (iequal(part.curr_field_.data(), part.curr_field_.size(), "Content-Disposition", 19))
@@ -211,7 +211,7 @@ namespace timax
 			multipart_parser_settings_.on_header_value = [](multipart_parser* p, const char *at, size_t length)
 			{
 				auto self = static_cast<request*>(multipart_parser_get_data(p));
-				auto& part = self->form_data_.back();
+				auto& part = self->multipart_form_data_.back();
 				part.state_ = 1;
 				part.curr_value_ += std::string(at, length);
 				return 0;
@@ -219,7 +219,7 @@ namespace timax
 			multipart_parser_settings_.on_headers_complete = [](multipart_parser* p)
 			{
 				auto self = static_cast<request*>(multipart_parser_get_data(p));
-				auto& part = self->form_data_.back();
+				auto& part = self->multipart_form_data_.back();
 				assert(part.state_ == 1);
 				part.meta_.emplace_back(part.curr_field_, part.curr_value_);
 				return 0;
@@ -227,7 +227,7 @@ namespace timax
 			multipart_parser_settings_.on_part_data = [](multipart_parser* p, const char *at, size_t length)
 			{
 				auto self = static_cast<request*>(multipart_parser_get_data(p));
-				auto& part = self->form_data_.back();
+				auto& part = self->multipart_form_data_.back();
 				part.data_ += std::string(at, length);
 
 				return 0;
@@ -249,6 +249,57 @@ namespace timax
 		}
 
 		return multipart_parser_execute(multipart_parser_, body().data(), body().size()) != 0;//== body().size();
+	}
+
+	bool request::parse_form_urlencoded()
+	{
+		std::string key, val;
+		bool is_k = true;
+
+		auto body_str = body();
+		for (auto it = body_str.begin(); it != body_str.end(); ++it)
+		{
+			char c = *it;
+			if (c == '&')
+			{
+				is_k = true;
+				urlencoded_form_data_.emplace(key, val);
+				key.clear();
+			}
+			else if (c == '=')
+			{
+				is_k = false;
+				val.clear();
+			}
+			else
+			{
+				if (c == '%')
+				{
+					++it;
+					char c1 = *it;
+					++it;
+					char c2 = *it;
+					c = htoi(c1, c2);
+				}
+
+				if (is_k)
+				{
+					key.push_back(c);
+				}
+				else
+				{
+					val.push_back(c);
+				}
+			}
+		}
+
+		if (!is_k)
+		{
+			urlencoded_form_data_.emplace(key, val);
+			return true;
+		}
+
+		return false;
 	}
 
 	boost::string_ref request::get_header(const char* name, size_t size) const
