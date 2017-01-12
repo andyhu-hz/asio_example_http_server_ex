@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
 				{
 					[](timax::websocket::ws_conn_ptr_t conn, boost::string_ref msg, timax::websocket::opcode_t opcode)
 					{
-						std::cout << msg.to_string() << std::endl;
+						//std::cout << msg.to_string() << std::endl;
 						auto ret = boost::make_shared<std::string>(msg.to_string());
 						conn->async_send_msg(*ret, opcode, [ret](boost::system::error_code const&) {});
 					}
