@@ -89,15 +89,15 @@ namespace timax
 			};
 
 			using frame_format_t = uint16_t;
-			static inline bool rsv1(frame_format_t &frame) { return frame & 64; }
-			static inline bool rsv23(frame_format_t &frame) { return frame & 48; }
+			static inline bool rsv1(frame_format_t &frame) { return (frame & 64) != 0; }
+			static inline bool rsv23(frame_format_t &frame) { return (frame & 48) != 0; }
 			static inline unsigned char get_opcode(frame_format_t &frame) { return frame & 15; }
 			static inline unsigned char payload_length(frame_format_t &frame) { return (frame >> 8) & 127; }
-			static inline bool is_fin(frame_format_t &frame) { return frame & 128; }
-			static inline bool refuse_payload_length(void *user, int length) { return length > 16777216; }
+			static inline bool is_fin(frame_format_t &frame) { return (frame & 128) != 0; }
+			static inline bool refuse_payload_length(void *user, std::size_t length) { return length > 16777216; }
 
-			static void unmask_imprecise(char *dst, char *src, char *mask, unsigned int length);
-			static void unmask_imprecise_copy_mask(char *dst, char *src, char *maskPtr, unsigned int length);
+			static void unmask_imprecise(char *dst, char *src, char *mask, std::size_t length);
+			static void unmask_imprecise_copy_mask(char *dst, char *src, char *maskPtr, std::size_t length);
 			static void unmask_inplace(char *data, char *stop, char *mask);
 			static void rotate_mask(unsigned int offset, char *mask);
 			static close_frame_t parse_close_payload(char *src, size_t length);
@@ -106,10 +106,10 @@ namespace timax
 			bool set_compressed(void *user) { return false; }	//TODO:ÃÌº”gzip÷ß≥÷
 			void force_close(void *user) {}	//TODO: close connection
 
-			void consume(char *src, unsigned int length, void *user);
+			void consume(char *src, std::size_t length, void *user);
 
 			template <const int MESSAGE_HEADER, typename T>
-			inline bool consume_message(T pay_length, char *&src, unsigned int &length, frame_format_t frame, void *user)
+			inline bool consume_message(T pay_length, char *&src, std::size_t &length, frame_format_t frame, void *user)
 			{
 				if (get_opcode(frame))
 				{
@@ -127,7 +127,7 @@ namespace timax
 				}
 				last_fin = is_fin(frame);
 
-				if (refuse_payload_length(user, pay_length))
+				if (refuse_payload_length(user, static_cast<std::size_t>(pay_length)))
 				{
 					force_close(user);
 					return true;
@@ -136,14 +136,14 @@ namespace timax
 				if (int(pay_length) <= int(length - MESSAGE_HEADER))
 				{
 					
-					unmask_imprecise_copy_mask(src, src + MESSAGE_HEADER, src + MESSAGE_HEADER - 4, pay_length);
-					if (handle_fragment(src, pay_length, 0, opcode[(unsigned char)op_stack], is_fin(frame), user))
+					unmask_imprecise_copy_mask(src, src + MESSAGE_HEADER, src + MESSAGE_HEADER - 4, static_cast<std::size_t>(pay_length));
+					if (handle_fragment(src, static_cast<std::size_t>(pay_length), 0, opcode[(unsigned char)op_stack], is_fin(frame), user))
 					{
 						return true;
 					}
 					else
 					{
-						if (handle_fragment(src + MESSAGE_HEADER, pay_length, 0, opcode[(unsigned char)op_stack], is_fin(frame), user))
+						if (handle_fragment(src + MESSAGE_HEADER, static_cast<std::size_t>(pay_length), 0, opcode[(unsigned char)op_stack], is_fin(frame), user))
 						{
 							return true;
 						}
@@ -155,7 +155,7 @@ namespace timax
 					}
 
 					src += pay_length + MESSAGE_HEADER;
-					length -= pay_length + MESSAGE_HEADER;
+					length -= static_cast<std::size_t>(pay_length + MESSAGE_HEADER);
 					spill_length = 0;
 					return false;
 				}
@@ -163,7 +163,7 @@ namespace timax
 				{
 					spill_length = 0;
 					state = READ_MESSAGE;
-					remaining_bytes = pay_length - length + MESSAGE_HEADER;
+					remaining_bytes = static_cast<std::size_t>(pay_length - length + MESSAGE_HEADER);
 
 					memcpy(mask, src + MESSAGE_HEADER - 4, 4);
 					unmask_imprecise(src, src + MESSAGE_HEADER, mask, length);
@@ -173,9 +173,9 @@ namespace timax
 				}
 			}
 
-			bool consume_continuation(char *&src, unsigned int &length, void *user);
+			bool consume_continuation(char *&src, std::size_t &length, void *user);
 
-			bool handle_fragment(char *data, size_t length, unsigned int remaining_bytes, int opcode, bool fin, void *user);
+			bool handle_fragment(char *data, size_t length, std::size_t remaining_bytes, int opcode, bool fin, void *user);
 
 			std::vector<boost::asio::const_buffer> format_message(const char *src, size_t length, opcode_t opcode/*, size_t reportedLength, bool compressed*/);
 
@@ -201,11 +201,11 @@ namespace timax
 			// this can hold two states (1 bit)
 			// this can hold length of spill (up to 16 = 4 bit)
 			unsigned char state = READ_HEAD;
-			unsigned char spill_length = 0; // remove this!
+			std::size_t spill_length = 0; // remove this!
 			char op_stack = -1; // remove this too
 			char last_fin = true; // hold in state!
 			unsigned char spill[LONG_MESSAGE_HEADER - 1];
-			unsigned int remaining_bytes = 0;
+			std::size_t remaining_bytes = 0;
 			char mask[4];
 			opcode_t opcode[2];
 

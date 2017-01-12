@@ -131,7 +131,7 @@ namespace timax
 		{
 			content_.resize(1024 * 1024);
 			fs_.read(&content_[0], content_.size());
-			buffers.emplace_back(boost::asio::buffer(content_.data(), fs_.gcount()));
+			buffers.emplace_back(boost::asio::buffer(content_.data(), static_cast<std::size_t>(fs_.gcount())));
 			return fs_.eof();
 		}
 			break;

@@ -120,7 +120,7 @@ namespace timax
 // 				startTimeout<WebSocket<isServer>::onEnd>();
 
 			char close_payload[MAX_CLOSE_PAYLOAD + 2];
-			int close_payload_length = format_close_payload(close_payload, code, message, length);
+			std::size_t close_payload_length = format_close_payload(close_payload, code, message, length);
 			auto self = this->shared_from_this();
 			async_send_msg(close_payload, close_payload_length, opcode_t::CLOSE, [self, this](boost::system::error_code const& ec)
 			{
@@ -135,9 +135,9 @@ namespace timax
 			});
 		}
 
-		void websocket_connection::unmask_imprecise(char *dst, char *src, char *mask, unsigned int length)
+		void websocket_connection::unmask_imprecise(char *dst, char *src, char *mask, std::size_t length)
 		{
-			for (unsigned int n = (length >> 2) + 1; n; n--)
+			for (std::size_t n = (length >> 2) + 1; n; n--)
 			{
 				*(dst++) = *(src++) ^ mask[0];
 				*(dst++) = *(src++) ^ mask[1];
@@ -146,7 +146,7 @@ namespace timax
 			}
 		}
 
-		void websocket_connection::unmask_imprecise_copy_mask(char *dst, char *src, char *mask_ptr, unsigned int length)
+		void websocket_connection::unmask_imprecise_copy_mask(char *dst, char *src, char *mask_ptr, std::size_t length)
 		{
 			char mask[4] = { mask_ptr[0], mask_ptr[1], mask_ptr[2], mask_ptr[3] };
 			unmask_imprecise(dst, src, mask, length);
@@ -177,7 +177,7 @@ namespace timax
 			close_frame_t cf = {};
 			if (length >= 2)
 			{
-				memcpy(&cf.code, src, 2);
+				std::memcpy(&cf.code, src, 2);
 				cf = { ntohs(cf.code), src + 2, length - 2 };
 				if (cf.code < 1000 || cf.code > 4999 || (cf.code > 1011 && cf.code < 4000) ||
 					(cf.code >= 1004 && cf.code <= 1006) || !is_valid_utf8((unsigned char *)cf.message, cf.length))
@@ -188,20 +188,20 @@ namespace timax
 			return cf;
 		}
 
-		void websocket_connection::consume(char *src, unsigned int length, void *user)
+		void websocket_connection::consume(char *src, std::size_t length, void *user)
 		{
 			if (spill_length)
 			{
 				src -= spill_length;
 				length += spill_length;
-				memcpy(src, spill, spill_length);
+				std::memcpy(src, spill, spill_length);
 			}
 			if (state == READ_HEAD)
 			{
 			parseNext:
 				for (frame_format_t frame; length >= SHORT_MESSAGE_HEADER; )
 				{
-					memcpy(&frame, src, sizeof(frame_format_t));
+					std::memcpy(&frame, src, sizeof(frame_format_t));
 
 					// invalid reserved bits / invalid opcodes / invalid control frames / set compressed frame
 					if ((rsv1(frame) && !set_compressed(user)) || rsv23(frame) || (get_opcode(frame) > 2 && get_opcode(frame) < 8) ||
@@ -240,7 +240,7 @@ namespace timax
 				}
 				if (length)
 				{
-					memcpy(spill, src, length);
+					std::memcpy(spill, src, length);
 					spill_length = length;
 				}
 			}
@@ -250,18 +250,18 @@ namespace timax
 			}
 		}
 
-		bool websocket_connection::consume_continuation(char *&src, unsigned int &length, void *user)
+		bool websocket_connection::consume_continuation(char *&src, std::size_t &length, void *user)
 		{
 			if (remaining_bytes <= length)
 			{
-				int n = remaining_bytes >> 2;
+				std::size_t n = remaining_bytes >> 2;
 				unmask_inplace(src, src + n * 4, mask);
 				for (int i = 0, s = remaining_bytes % 4; i < s; i++)
 				{
 					src[n * 4 + i] ^= mask[i];
 				}
 
-				if (handle_fragment(src, remaining_bytes, 0, opcode[(unsigned char)op_stack], last_fin, user))
+				if (handle_fragment(src, remaining_bytes, 0, opcode[(unsigned char)op_stack], last_fin != 0, user))
 				{
 					return false;
 				}
@@ -281,7 +281,7 @@ namespace timax
 				unmask_inplace(src, src + ((length >> 2) + 1) * 4, mask);
 
 				remaining_bytes -= length;
-				if (handle_fragment(src, length, remaining_bytes, opcode[(unsigned char)op_stack], last_fin, user))
+				if (handle_fragment(src, length, remaining_bytes, opcode[(unsigned char)op_stack], last_fin != 0, user))
 				{
 					return false;
 				}
@@ -294,7 +294,7 @@ namespace timax
 			}
 		}
 
-		bool websocket_connection::handle_fragment(char *data, size_t length, unsigned int remaining_bytes, int opcode, bool fin, void *user)
+		bool websocket_connection::handle_fragment(char *data, size_t length, std::size_t remaining_bytes, int opcode, bool fin, void *user)
 		{
 			if (opcode < 3)
 			{
@@ -325,8 +325,6 @@ namespace timax
 					{
 						return true;
 					}
-					auto self = this->shared_from_this();
-					async_send_msg(data, length, opcode_t::TEXT, [self](boost::system::error_code const&) {});
 				}
 				else
 				{
@@ -422,13 +420,13 @@ namespace timax
 			if (length < 126)
 			{
 				header_length = 2;
-				msg_header_[1] = length;
+				msg_header_[1] = static_cast<char>(length);
 			}
 			else if (length <= UINT16_MAX)
 			{
 				header_length = 4;
 				msg_header_[1] = 126;
-				*((uint16_t *)&msg_header_[2]) = htons(length);
+				*((uint16_t *)&msg_header_[2]) = htons(static_cast<uint16_t>(length));
 			}
 			else
 			{
@@ -452,8 +450,8 @@ namespace timax
 			if (code)
 			{
 				code = htons(code);
-				memcpy(dst, &code, 2);
-				memcpy(dst + 2, message, length);
+				std::memcpy(dst, &code, 2);
+				std::memcpy(dst + 2, message, length);
 				return length + 2;
 			}
 			return 0;

@@ -89,7 +89,7 @@ namespace timax
 
 		std::size_t headers_num_cs(std::string const& name) const;
 
-		int header_size() const { return header_size_; }
+		std::size_t header_size() const { return header_size_; }
 
 		bool is_chunked() const
 		{
