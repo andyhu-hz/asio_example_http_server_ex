@@ -1,7 +1,7 @@
 #include "websocket.h"
 #include "utils.h"
 
-#include <boost/smart_ptr/make_shared.hpp>
+#include <boost/smart_ptr.hpp>
 #include <openssl/evp.h>
 #include <openssl/buffer.h>
 #include <openssl/sha.h>
@@ -11,6 +11,13 @@ namespace timax
 {
 	namespace websocket
 	{
+
+		websocket_connection::websocket_connection(boost::shared_ptr<reply::connection> conn, ws_config_t cfg)
+			:conn_(std::move(conn)), buffer_(8192 + LONG_MESSAGE_HEADER), cfg_(std::move(cfg))
+		{
+
+		}
+
 		boost::string_ref websocket_connection::is_websocket_handshake(const request& req)
 		{
 			// websocket的握手必须是GET方式
@@ -82,7 +89,7 @@ namespace timax
 		void websocket_connection::start()
 		{
 			auto self = this->shared_from_this();
-			conn_->async_read_some(buffer_.data(), buffer_.size(), [self, this](boost::system::error_code const& ec, std::size_t length)
+			conn_->async_read_some(buffer_.data() + LONG_MESSAGE_HEADER, buffer_.size() - LONG_MESSAGE_HEADER, [self, this](boost::system::error_code const& ec, std::size_t length)
 			{
 				if (ec)
 				{
@@ -93,7 +100,7 @@ namespace timax
 					return;
 				}
 
-				consume(buffer_.data(), length, nullptr);
+				consume(buffer_.data() + LONG_MESSAGE_HEADER, length, nullptr);
 				start();
 			});
 		}
@@ -119,10 +126,11 @@ namespace timax
 //TODO: Timer
 // 				startTimeout<WebSocket<isServer>::onEnd>();
 
-			char close_payload[MAX_CLOSE_PAYLOAD + 2];
-			std::size_t close_payload_length = format_close_payload(close_payload, code, message, length);
+// 			char close_payload[MAX_CLOSE_PAYLOAD + 2];
+			boost::shared_array<char> close_payload(new char[MAX_CLOSE_PAYLOAD + 2]);
+			std::size_t close_payload_length = format_close_payload(close_payload.get(), code, message, length);
 			auto self = this->shared_from_this();
-			async_send_msg(close_payload, close_payload_length, opcode_t::CLOSE, [self, this](boost::system::error_code const& ec)
+			async_send_msg(close_payload.get(), close_payload_length, opcode_t::CLOSE, [close_payload, self, this](boost::system::error_code const& ec)
 			{
 				if (ec)
 				{

@@ -46,10 +46,7 @@ namespace timax
 		{
 		public:
 			websocket_connection() = delete;
-			websocket_connection(boost::shared_ptr<reply::connection> conn, ws_config_t cfg)
-				:conn_(std::move(conn)), buffer_(8192), cfg_(std::move(cfg))
-			{
-			}
+			websocket_connection(boost::shared_ptr<reply::connection> conn, ws_config_t cfg);
 			~websocket_connection()
 			{
 
