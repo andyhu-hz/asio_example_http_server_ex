@@ -42,6 +42,9 @@
     <ClCompile Include="multipart_parser.c">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="websocket.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="connection.hpp">
@@ -69,6 +72,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="multipart_parser.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="websocket.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

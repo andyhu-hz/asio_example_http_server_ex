@@ -20,43 +20,72 @@ namespace timax
 	{
 	public:
 
-		using async_handler_t = boost::function<void(const boost::system::error_code&, std::size_t)>;
-		using chunked_handler_t = boost::function<void(boost::string_ref, intptr_t)>;
+		using handler_ec_t = boost::function<void(boost::system::error_code const&)>;
+		using handler_ec_size_t = boost::function<void(boost::system::error_code const&, std::size_t)>;
+		using handler_strref_intptr_t = boost::function<void(boost::string_ref, intptr_t)>;
 
-		using write_func_t = boost::function<void(const void*, std::size_t, async_handler_t)>;
-		using read_func_t = boost::function<void(void*, std::size_t, async_handler_t)>;
-		using read_chunk_func_t = boost::function<void(chunked_handler_t)>;
-		using end_func_t = boost::function<void()>;
+		using write_func1_t = boost::function<void(const void*, std::size_t, handler_ec_size_t)>;
+		using write_func2_t = boost::function<void(std::vector<boost::asio::const_buffer> const&, handler_ec_size_t)>;
+		using read_func_t = boost::function<void(void*, std::size_t, handler_ec_size_t)>;
+		using read_chunk_func_t = boost::function<void(handler_strref_intptr_t)>;
+		using shutdown_func_t = boost::function<void(handler_ec_t)>;
+		using close_func_t = boost::function<void(void)>;
+		using is_closed_func_t = boost::function<bool(void)>;
+		using end_func_t = boost::function<void(void)>;
 
 		class connection
 		{
 		public:
 			connection() = default;
-			connection(reply& rep, write_func_t write_func, read_func_t read_func,
-				read_func_t read_some_func, read_chunk_func_t read_chunk_func, end_func_t end_func)
-				:rep_(rep), write_func_(std::move(write_func)), read_func_(std::move(read_func)),
-				read_chunk_func_(std::move(read_chunk_func)), read_some_func_(std::move(read_some_func)), end_func_(std::move(end_func))
+			//TODO:怎样简化???????
+			connection(reply& rep, write_func1_t write_func1, write_func2_t write_func2,
+				read_func_t read_func, read_func_t read_some_func, read_chunk_func_t read_chunk_func,
+				shutdown_func_t shutdown_func, close_func_t close_func, is_closed_func_t is_closed_func, end_func_t end_func)
+				:rep_(rep), write_func1_(std::move(write_func1)), write_func2_(std::move(write_func2)),
+				read_func_(std::move(read_func)), read_chunk_func_(std::move(read_chunk_func)), read_some_func_(std::move(read_some_func)),
+				shutdown_func_(std::move(shutdown_func)), close_func_(std::move(close_func)), is_closed_func_(std::move(is_closed_func)), end_func_(std::move(end_func))
 			{}
 
-			void async_write(const void* data, std::size_t size, async_handler_t handler) const
+			void async_write(const void* data, std::size_t size, handler_ec_size_t handler) const
 			{
-				write_func_(data, size, std::move(handler));
+				write_func1_(data, size, std::move(handler));
 			}
 
-			void async_read(void* data, std::size_t size, async_handler_t handler) const
+			void async_write(std::vector<boost::asio::const_buffer> const& buffers, handler_ec_size_t handler) const
+			{
+				write_func2_(buffers, std::move(handler));
+			}
+
+			void async_read(void* data, std::size_t size, handler_ec_size_t handler) const
 			{
 				read_func_(data, size, std::move(handler));
 			}
 
-			void async_read_some(void* data, std::size_t size, async_handler_t handler)
+			void async_read_some(void* data, std::size_t size, handler_ec_size_t handler)
 			{
 				read_some_func_(data, size, handler);
 			}
 
-			void async_read_chunk(chunked_handler_t handler)
+			void async_read_chunk(handler_strref_intptr_t handler)
 			{
 				read_chunk_func_(handler);
 			}
+
+			void shutdown(handler_ec_t handler)
+			{
+				shutdown_func_(handler);
+			}
+
+			void close()
+			{
+				close_func_();
+			}
+
+			bool is_closed()
+			{
+				return is_closed_func_();
+			}
+
 			reply const& get_reply() const
 			{
 				return rep_;
@@ -72,10 +101,14 @@ namespace timax
 			}
 		private:
 			reply& rep_;
-			write_func_t write_func_;
+			write_func1_t write_func1_;
+			write_func2_t write_func2_;
 			read_func_t read_func_;
 			read_func_t read_some_func_;
 			read_chunk_func_t read_chunk_func_;
+			shutdown_func_t shutdown_func_;
+			close_func_t close_func_;
+			is_closed_func_t is_closed_func_;
 			end_func_t end_func_;
 		};
 
@@ -83,6 +116,7 @@ namespace timax
 
 		enum status_type
 		{
+			switching_protocols = 101,
 			ok = 200,
 			created = 201,
 			accepted = 202,

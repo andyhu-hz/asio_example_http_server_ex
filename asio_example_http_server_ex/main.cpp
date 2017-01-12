@@ -1,6 +1,7 @@
 ﻿
 #include "server.hpp"
 #include "utils.h"
+#include "websocket.h"
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -141,6 +142,24 @@ int main(int argc, char* argv[])
 				}
 
 				rep = timax::reply::stock_reply(timax::reply::ok);
+			}
+			else if (req.path() == "/websocket")
+			{
+				std::cout << "On websocket" << std::endl;
+				for (auto it : req.get_headers())
+				{
+					std::cout << it.name << ": " << it.value << std::endl;
+				}
+
+				auto str = timax::websocket::websocket_connection::is_websocket_handshake(req);
+				timax::websocket::websocket_connection::upgrade_to_websocket(req, rep, str, timax::websocket::ws_config_t
+				{
+					[](timax::websocket::ws_conn_ptr_t conn, boost::string_ref msg, timax::websocket::opcode_t opcode)
+					{
+						auto ret = boost::make_shared<std::string>(msg);
+						conn->async_send_msg(*ret, opcode, [ret](boost::system::error_code const&) {});
+					}
+				});
 			}
 			else
 			{

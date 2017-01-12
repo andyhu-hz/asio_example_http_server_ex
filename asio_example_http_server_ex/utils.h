@@ -54,6 +54,10 @@ namespace timax
 		return (value);
 	}
 
+	size_t base64_encode(char *_dst, const void *_src, size_t len, int url_encoded);
+
+	bool is_valid_utf8(unsigned char *s, size_t length);
+
 }
 
 

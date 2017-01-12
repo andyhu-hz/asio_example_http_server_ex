@@ -15,6 +15,8 @@ namespace timax
 {
 	namespace status_strings
 	{
+		const std::string switching_protocols =
+			"HTTP/1.1 101 Switching Protocals\r\n";
 		const std::string ok =
 			"HTTP/1.1 200 OK\r\n";
 		const std::string created =
@@ -52,6 +54,8 @@ namespace timax
 		{
 			switch (status)
 			{
+			case reply::switching_protocols:
+				return boost::asio::buffer(switching_protocols);
 			case reply::ok:
 				return boost::asio::buffer(ok);
 			case reply::created:

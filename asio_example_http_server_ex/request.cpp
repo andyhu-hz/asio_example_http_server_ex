@@ -180,6 +180,7 @@ namespace timax
 
 			auto boundary = "--" + content_type.substr(pos, content_type.size() - pos);
 
+			// TODO:¸ÄÎªstatic const
 			multipart_parser_settings_.on_part_data_begin = [](multipart_parser* p)
 			{
 				std::cout << "begin" << std::endl;

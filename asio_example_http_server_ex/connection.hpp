@@ -59,13 +59,17 @@ namespace timax
 				}
 
 				return boost::make_shared<reply::connection>(reply_,
-					[self, this](const void* data, std::size_t size, reply::async_handler_t handler) {return delay_write(data, size, std::move(handler));},
+					[self, this](const void* data, std::size_t size, reply::handler_ec_size_t handler) {delay_write(data, size, std::move(handler));},
+					[self, this](std::vector<boost::asio::const_buffer> const& buffers, reply::handler_ec_size_t handler) {delay_write(buffers, std::move(handler));},
 
-					[self, this](void* data, std::size_t size, reply::async_handler_t handler) {return delay_read(data, size, handler);},
+					[self, this](void* data, std::size_t size, reply::handler_ec_size_t handler) {delay_read(data, size, handler);},
+					[self, this](void* data, std::size_t size, reply::handler_ec_size_t handler) {delay_read_some(data, size, handler);},
+					[self, this](reply::handler_strref_intptr_t handler) {delay_read_chunk(handler);},
 
-					[self, this](void* data, std::size_t size, reply::async_handler_t handler) {return delay_read_some(data, size, handler);},
+					[self, this](reply::handler_ec_t) {shutdown(socket_);},
+					[self, this]() {close();},
 
-					[self, this](reply::chunked_handler_t handler) {return delay_read_chunk(handler);},
+					[self, this]() {return !socket().lowest_layer().is_open();},
 
 					[self, this]()
 					{
@@ -334,18 +338,20 @@ namespace timax
 			keep_alive_ = iequal(rep_conn_hdr.data(), rep_conn_hdr.size(), "keep-alive", 10);
 		}
 
+		//TODO: shutdown之后继续read,读取到eof再关闭链接
 		void shutdown(boost::asio::ip::tcp::socket const&)
 		{
 			boost::system::error_code ignored_ec;
-			socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
+			socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_send, ignored_ec);
 		}
-		void shutdown(boost::asio::ssl::stream<boost::asio::ip::tcp::socket> const&)
+		void shutdown(boost::asio::ssl::stream<boost::asio::ip::tcp::socket> const&s)
 		{
+			//s.async_shutdown()
 		}
 
 
 	private:
-		void delay_write(const void* data, std::size_t size, reply::async_handler_t handler)
+		void delay_write(const void* data, std::size_t size, reply::handler_ec_size_t handler)
 		{
 			reset_timer();
 			if (!reply_.header_buffer_wroted())
@@ -373,19 +379,48 @@ namespace timax
 			boost::asio::async_write(socket_, boost::asio::buffer(data, size), handler);
 		}
 
-		void delay_read(void* data, std::size_t size, reply::async_handler_t handler)
+		void delay_write(std::vector<boost::asio::const_buffer> const& buffers, reply::handler_ec_size_t handler)
+		{
+			reset_timer();
+			// TODO:合并
+			if (!reply_.header_buffer_wroted())
+			{
+				check_keep_alive();
+				assert(reply_.body_type() == reply::none);
+				std::vector<boost::asio::const_buffer> buffers;
+				auto finished = reply_.to_buffers(buffers);
+				assert(finished);
+				auto self = this->shared_from_this();
+				boost::asio::async_write(socket_, buffers,
+					[self, this, buffers, handler](const boost::system::error_code& ec, std::size_t /*length*/)
+				{
+					if (ec)
+					{
+						handler(ec, 0);
+						return;
+					}
+
+					delay_write(buffers, std::move(handler));
+				});
+				return;
+			}
+
+			boost::asio::async_write(socket_, buffers, handler);
+		}
+
+		void delay_read(void* data, std::size_t size, reply::handler_ec_size_t handler)
 		{
 			reset_timer();
 			boost::asio::async_read(socket_, boost::asio::buffer(data, size), handler);
 		}
 
-		void delay_read_some(void* data, std::size_t size, reply::async_handler_t handler)
+		void delay_read_some(void* data, std::size_t size, reply::handler_ec_size_t handler)
 		{
 			reset_timer();
 			socket_.async_read_some(boost::asio::buffer(data, size), handler);
 		}
 
-		void delay_read_chunk(reply::chunked_handler_t handler)
+		void delay_read_chunk(reply::handler_strref_intptr_t handler)
 		{
 			auto& buf = request_.raw_request();
 			if (buf.size > request_.header_size())
