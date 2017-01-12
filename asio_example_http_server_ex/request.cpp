@@ -6,7 +6,6 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/regex.hpp>
 #include <cstdlib>
-#include <iostream>
 
 namespace timax
 {
@@ -183,7 +182,6 @@ namespace timax
 			// TODO:¸ÄÎªstatic const
 			multipart_parser_settings_.on_part_data_begin = [](multipart_parser* p)
 			{
-				std::cout << "begin" << std::endl;
 				auto self = static_cast<request*>(multipart_parser_get_data(p));
 				self->multipart_form_data_.emplace_back(form_parts_t{});
 				return 0;

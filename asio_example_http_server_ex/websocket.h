@@ -7,7 +7,6 @@
 #include <vector>
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
-#include <iostream>
 
 #ifdef _WIN32
 #define be64toh(x) ntohll(x)
@@ -50,6 +49,10 @@ namespace timax
 			websocket_connection(boost::shared_ptr<reply::connection> conn, ws_config_t cfg)
 				:conn_(std::move(conn)), buffer_(8192), cfg_(std::move(cfg))
 			{
+			}
+			~websocket_connection()
+			{
+
 			}
 			static boost::string_ref is_websocket_handshake(const request& req);
 			static void upgrade_to_websocket(request const& req, reply& rep, boost::string_ref const& client_key, ws_config_t cfg);
@@ -104,7 +107,7 @@ namespace timax
 
 
 			bool set_compressed(void *user) { return false; }	//TODO:Ìí¼ÓgzipÖ§³Ö
-			void force_close(void *user) {}	//TODO: close connection
+			void force_close(void *user) { conn_->close(); }	//TODO: close connection
 
 			void consume(char *src, std::size_t length, void *user);
 
@@ -140,13 +143,6 @@ namespace timax
 					if (handle_fragment(src, static_cast<std::size_t>(pay_length), 0, opcode[(unsigned char)op_stack], is_fin(frame), user))
 					{
 						return true;
-					}
-					else
-					{
-						if (handle_fragment(src + MESSAGE_HEADER, static_cast<std::size_t>(pay_length), 0, opcode[(unsigned char)op_stack], is_fin(frame), user))
-						{
-							return true;
-						}
 					}
 
 					if (is_fin(frame))
