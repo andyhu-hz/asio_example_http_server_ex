@@ -9,8 +9,7 @@
 namespace timax
 {
 	server::server(std::size_t io_service_pool_size)
-		: io_service_pool_(io_service_pool_size),
-		tls_ctx_(boost::asio::ssl::context::sslv23)
+		: io_service_pool_(io_service_pool_size)
 	{
 	}
 
@@ -22,25 +21,26 @@ namespace timax
 		return *this;
 	}
 
-	timax::server& server::listen(const std::string& address, const std::string& port,
+	timax::server& server::listen(const std::string& address, const std::string& port, ssl_method_t ssl_method,
 		const std::string& private_key, const std::string& certificate_chain, bool is_file /*= true*/)
 	{
+		auto ssl_ctx = boost::make_shared<boost::asio::ssl::context>(static_cast<boost::asio::ssl::context::method>(ssl_method));
 		if (is_file)
 		{
-			tls_ctx_.use_private_key_file(private_key, boost::asio::ssl::context::pem);
-			tls_ctx_.use_certificate_chain_file(certificate_chain);
+			ssl_ctx->use_private_key_file(private_key, boost::asio::ssl::context::pem);
+			ssl_ctx->use_certificate_chain_file(certificate_chain);
 		}
 		else
 		{
-			tls_ctx_.use_private_key(boost::asio::buffer(private_key), boost::asio::ssl::context::pem);
-			tls_ctx_.use_certificate_chain(boost::asio::buffer(certificate_chain));
+			ssl_ctx->use_private_key(boost::asio::buffer(private_key), boost::asio::ssl::context::pem);
+			ssl_ctx->use_certificate_chain(boost::asio::buffer(certificate_chain));
 		}
 
 		//HTTP2???
 		//configure_tls_context_easy(ec, tls);
 		auto acceprot = boost::make_shared<boost::asio::ip::tcp::acceptor>(io_service_pool_.get_io_service());
 		do_listen(acceprot, address, port);
-		start_accept_tls(acceprot);
+		start_accept(acceprot, ssl_ctx);
 		return *this;
 	}
 
@@ -69,11 +69,12 @@ namespace timax
 		});
 	}
 
-	void server::start_accept_tls(boost::shared_ptr<boost::asio::ip::tcp::acceptor> const& acceptor)
+	void server::start_accept(boost::shared_ptr<boost::asio::ip::tcp::acceptor> const& acceptor,
+		boost::shared_ptr<boost::asio::ssl::context> const& ssl_ctx)
 	{
 		auto new_conn = boost::make_shared<connection<boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>>(
-			io_service_pool_.get_io_service(), request_handler_, tls_ctx_);
-		acceptor->async_accept(new_conn->socket().lowest_layer(), [this, new_conn, acceptor](const boost::system::error_code& e)
+			io_service_pool_.get_io_service(), request_handler_, *ssl_ctx);
+		acceptor->async_accept(new_conn->socket().lowest_layer(), [this, new_conn, acceptor, ssl_ctx](const boost::system::error_code& e)
 		{
 			if (!e)
 			{
@@ -99,11 +100,11 @@ namespace timax
 				std::cout << "server::handle_accept: " << e.message() << std::endl;
 			}
 
-			start_accept_tls(acceptor);
+			start_accept(acceptor, ssl_ctx);
 		});
 	}
 
-	void server::do_listen(boost::shared_ptr<boost::asio::ip::tcp::acceptor>& acceptor,
+	void server::do_listen(boost::shared_ptr<boost::asio::ip::tcp::acceptor> const& acceptor,
 		const std::string& address, const std::string& port)
 	{
 		boost::asio::ip::tcp::resolver resolver(acceptor->get_io_service());

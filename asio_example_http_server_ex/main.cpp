@@ -163,7 +163,8 @@ int main(int argc, char* argv[])
 		});
 
 		s.listen(argv[1], argv[2])
-			.listen("0.0.0.0", "8089",	//如果is_file为true,private_key和certificate_chain参数为证书路径,否则为证书内容
+			.listen("0.0.0.0", "8089", timax::server::tlsv12,
+//如果is_file为true,private_key和certificate_chain参数为证书路径,否则为证书内容
 R"_(-----BEGIN RSA PRIVATE KEY-----
 MIICWwIBAAKBgQDBx36qaiKo9cgOuvfs4SfPaD+uesuGXwfUmCa1tt8O+3Cv71k0
 lMdzuQDds9GmcHQpl1i+wxkCdCikyfOZ16ODefJfUYbD1ubq0p9OCnvGZd3GIgO5

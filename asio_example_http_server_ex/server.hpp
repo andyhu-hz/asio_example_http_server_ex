@@ -20,8 +20,19 @@ namespace timax
 	public:
 		explicit server(std::size_t io_service_pool_size);
 
+
+		enum ssl_method_t
+		{
+			sslv2 = boost::asio::ssl::context::sslv2_server,
+			sslv3 = boost::asio::ssl::context::sslv3_server,
+			tlsv1 = boost::asio::ssl::context::tlsv1_server,
+			tlsv11 = boost::asio::ssl::context::tlsv11_server,
+			tlsv12 = boost::asio::ssl::context::tlsv12_server,
+			sslv23 = boost::asio::ssl::context::sslv23_server
+		};
+
 		server& listen(const std::string& address, const std::string& port);
-		server& listen(const std::string& address, const std::string& port,
+		server& listen(const std::string& address, const std::string& port, ssl_method_t ssl_method,
 			const std::string& private_key, const std::string& certificate_chain, bool is_file = true);
 
 		void run();
@@ -35,15 +46,13 @@ namespace timax
 
 	private:
 		void start_accept(boost::shared_ptr<boost::asio::ip::tcp::acceptor> const& acceptor);
-		void start_accept_tls(boost::shared_ptr<boost::asio::ip::tcp::acceptor> const& acceptor);
+		void start_accept(boost::shared_ptr<boost::asio::ip::tcp::acceptor> const& acceptor,
+			boost::shared_ptr<boost::asio::ssl::context> const& ssl_ctx);
 
-		void do_listen(boost::shared_ptr<boost::asio::ip::tcp::acceptor>& acceptor,
+		void do_listen(boost::shared_ptr<boost::asio::ip::tcp::acceptor> const& acceptor,
 			const std::string& address, const std::string& port);
 
 		io_service_pool io_service_pool_;
-
-		boost::asio::ssl::context tls_ctx_;;
-
 		request_handler_t request_handler_;
 	};
 
